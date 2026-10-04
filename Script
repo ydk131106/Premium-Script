@@ -1,0 +1,518 @@
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- 로컬 플레이어가 완전히 로드될 때까지 안전하게 대기
+local lp = Players.LocalPlayer
+while not lp do
+    Players.PlayerAdded:Wait()
+    lp = Players.LocalPlayer
+end
+
+-- ==========================================
+-- [설정] 실행 시 미리 입력해 둘 ID 목록
+-- 빈 칸으로 두고 싶다면 "" 로 두시면 됩니다.
+-- ==========================================
+local DefaultIDs = {
+    shirt = "6572946341",                    -- 클래식 셔츠 ID
+    pants = "13776596066",                    -- 클래식 바지 ID
+    hair = "14892162637",                     -- 머리카락 ID
+    hat = "",                  -- 머리 장신구 ID
+    face = "17448639408",                  -- 얼굴 장신구 ID
+    neck = "",                 -- 목 장신구 ID
+    shoulder = "",                            -- 어깨 장신구 ID
+    front = "",                               -- 전면 장신구 ID
+    back = "",                                -- 후면 장신구 ID
+    waist = ""                     -- 허리 장신구 ID
+}
+
+-- 기존 UI 삭제
+if CoreGui:FindFirstChild("BlackScreenUI") then
+    CoreGui.BlackScreenUI:Destroy()
+end
+
+-- ScreenGui 생성 (처음에는 안 보이도록 Enabled = false 설정)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BlackScreenUI"
+screenGui.DisplayOrder = 999
+screenGui.Parent = CoreGui
+screenGui.Enabled = false
+
+local frame = Instance.new("Frame")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 780, 0, 600)
+frame.Position = UDim2.new(0.5, -390, 0.5, -300)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = screenGui
+
+-- 드래그 기능
+local dragging, dragStart, initialPosition
+frame.InputBegan:Connect(function(input)
+    if screenGui.Enabled and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        dragging = true
+        dragStart = input.Position
+        initialPosition = frame.Position
+        UserInputService.MouseIconEnabled = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(initialPosition.X.Scale, initialPosition.X.Offset + delta.X, initialPosition.Y.Scale, initialPosition.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+        UserInputService.MouseIconEnabled = true
+    end
+end)
+
+-- 토글 키 (Delete) - 누르면 UI 보이기/숨기기 전환
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Delete then
+        screenGui.Enabled = not screenGui.Enabled
+    end
+end)
+
+-- 현재 착용 중인 아이템 상태 저장 (기본값으로 초기화)
+local currentOutfit = {
+    shirt = tonumber(DefaultIDs.shirt),
+    pants = tonumber(DefaultIDs.pants),
+    hair = tonumber(DefaultIDs.hair),
+    hat = tonumber(DefaultIDs.hat),
+    face = tonumber(DefaultIDs.face),
+    neck = tonumber(DefaultIDs.neck),
+    shoulder = tonumber(DefaultIDs.shoulder),
+    front = tonumber(DefaultIDs.front),
+    back = tonumber(DefaultIDs.back),
+    waist = tonumber(DefaultIDs.waist)
+}
+
+-- '계속 유지' 기능 상태를 기본적으로 켜둠 (true)
+local autoApplyEnabled = true
+
+-- UI 입력 필드 참조 테이블
+local inputFields = {}
+
+-- '계속 유지' UI 추가
+local keepCheckbox = Instance.new("TextButton", frame)
+keepCheckbox.Size = UDim2.new(0, 20, 0, 20)
+keepCheckbox.Position = UDim2.new(1, -120, 0, 15)
+keepCheckbox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+keepCheckbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+keepCheckbox.BorderSizePixel = 2
+keepCheckbox.Text = ""
+
+local keepLabel = Instance.new("TextLabel", frame)
+keepLabel.Size = UDim2.new(0, 80, 0, 20)
+keepLabel.Position = UDim2.new(1, -90, 0, 15)
+keepLabel.BackgroundTransparency = 1
+keepLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+keepLabel.Text = "계속 유지"
+keepLabel.TextScaled = true
+keepLabel.Font = Enum.Font.SourceSansBold
+keepLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+keepCheckbox.MouseButton1Click:Connect(function()
+    autoApplyEnabled = not autoApplyEnabled
+    keepCheckbox.BackgroundColor3 = autoApplyEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(0, 0, 0)
+    
+    if autoApplyEnabled then
+        currentOutfit.shirt = tonumber(inputFields.shirtIdTextBox.Text)
+        currentOutfit.pants = tonumber(inputFields.pantsIdTextBox.Text)
+        currentOutfit.hair = tonumber(inputFields.hairIdTextBox.Text)
+        currentOutfit.hat = tonumber(inputFields.hatIdTextBox.Text)
+        currentOutfit.face = tonumber(inputFields.faceIdTextBox.Text)
+        currentOutfit.neck = tonumber(inputFields.neckIdTextBox.Text)
+        currentOutfit.shoulder = tonumber(inputFields.shoulderIdTextBox.Text)
+        currentOutfit.front = tonumber(inputFields.frontIdTextBox.Text)
+        currentOutfit.back = tonumber(inputFields.backIdTextBox.Text)
+        currentOutfit.waist = tonumber(inputFields.waistIdTextBox.Text)
+    end
+end)
+
+-- Headless 기능
+local headlessEnabled = false
+local originalHeadTransparency = 0
+local originalHeadCanCollide = true
+
+local function setHeadlessState(enabled)
+    local character = lp.Character
+    if character then
+        local head = character:FindFirstChild("Head")
+        if head then
+            if enabled then
+                originalHeadTransparency = head.Transparency
+                originalHeadCanCollide = head.CanCollide
+                head.Transparency = 1
+                head.CanCollide = false
+            else
+                head.Transparency = originalHeadTransparency
+                head.CanCollide = originalHeadCanCollide
+            end
+        end
+    end
+end
+
+-- hairless 기능
+local hairlessEnabled = false
+local hairConnections = {}
+
+local function applyHairlessToAccessory(handle, enabled)
+    if handle then
+        handle.LocalTransparencyModifier = enabled and 1 or 0
+    end
+end
+
+local function setHairlessState(enabled)
+    hairlessEnabled = enabled
+    local character = lp.Character
+    if not character then return end
+    
+    for _, conn in pairs(hairConnections) do
+        conn:Disconnect()
+    end
+    hairConnections = {}
+    
+    for _, v in ipairs(character:GetChildren()) do
+        if v:IsA("Accessory") then
+            local handle = v:FindFirstChild("Handle")
+            if handle and (handle:FindFirstChild("HairAttachment") or v.Name:lower():find("hair")) then
+                applyHairlessToAccessory(handle, enabled)
+            end
+        end
+    end
+    
+    if enabled then
+        table.insert(hairConnections, character.ChildAdded:Connect(function(v)
+            if v:IsA("Accessory") then
+                task.wait(0.1)
+                local handle = v:FindFirstChild("Handle")
+                if handle and (handle:FindFirstChild("HairAttachment") or v.Name:lower():find("hair")) then
+                    applyHairlessToAccessory(handle, true)
+                end
+            end
+        end))
+    end
+end
+
+-- Headless 체크박스 UI
+local headlessCheckbox = Instance.new("TextButton", frame)
+headlessCheckbox.Size = UDim2.new(0, 20, 0, 20)
+headlessCheckbox.Position = UDim2.new(0, 10, 1, -35)
+headlessCheckbox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+headlessCheckbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+headlessCheckbox.BorderSizePixel = 2
+headlessCheckbox.Text = ""
+
+local headlessLabel = Instance.new("TextLabel", frame)
+headlessLabel.Size = UDim2.new(0, 80, 0, 20)
+headlessLabel.Position = UDim2.new(0, 35, 1, -35)
+headlessLabel.BackgroundTransparency = 1
+headlessLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+headlessLabel.Text = "Headless"
+headlessLabel.TextScaled = true
+headlessLabel.Font = Enum.Font.SourceSansBold
+headlessLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+headlessCheckbox.MouseButton1Click:Connect(function()
+    headlessEnabled = not headlessEnabled
+    headlessCheckbox.BackgroundColor3 = headlessEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(0, 0, 0)
+    setHeadlessState(headlessEnabled)
+end)
+
+-- hairless 체크박스 UI
+local hairlessCheckbox = Instance.new("TextButton", frame)
+hairlessCheckbox.Size = UDim2.new(0, 20, 0, 20)
+hairlessCheckbox.Position = UDim2.new(0, 10, 1, -65)
+hairlessCheckbox.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+hairlessCheckbox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+hairlessCheckbox.BorderSizePixel = 2
+hairlessCheckbox.Text = ""
+
+local hairlessLabel = Instance.new("TextLabel", frame)
+hairlessLabel.Size = UDim2.new(0, 80, 0, 20)
+hairlessLabel.Position = UDim2.new(0, 35, 1, -65)
+hairlessLabel.BackgroundTransparency = 1
+hairlessLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+hairlessLabel.Text = "hairless"
+hairlessLabel.TextScaled = true
+hairlessLabel.Font = Enum.Font.SourceSansBold
+hairlessLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+hairlessCheckbox.MouseButton1Click:Connect(function()
+    local newState = not hairlessEnabled
+    hairlessCheckbox.BackgroundColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(0, 0, 0)
+    setHairlessState(newState)
+end)
+
+-- 공통 UI 함수
+local function createUISection(name, yPos, buttonText, callback, outfitKey, defaultText)
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(0, 100, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Text = name
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSans
+
+    local textBox = Instance.new("TextBox", frame)
+    textBox.Size = UDim2.new(0, 150, 0, 30)
+    textBox.Position = UDim2.new(0, 120, 0, yPos)
+    textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textBox.PlaceholderText = "ID 입력"
+    textBox.Text = defaultText or ""
+    textBox.TextScaled = true
+    textBox.Font = Enum.Font.SourceSans
+    inputFields[outfitKey .. "IdTextBox"] = textBox
+
+    local button = Instance.new("TextButton", frame)
+    button.Size = UDim2.new(0, 150, 0, 30)
+    button.Position = UDim2.new(0, 280, 0, yPos)
+    button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = buttonText
+    button.TextScaled = true
+    button.Font = Enum.Font.SourceSans
+
+    button.MouseButton1Click:Connect(function()
+        callback(textBox.Text)
+        if autoApplyEnabled and outfitKey then
+            currentOutfit[outfitKey] = tonumber(textBox.Text)
+        end
+    end)
+end
+
+-- 장신구 크기 확대 함수
+local function scaleAccessory(handle, accessoryType)
+    local scaleFactor = 1.3
+    if accessoryType == "Waist" or accessoryType == "Neck" then
+        handle.Size = handle.Size * scaleFactor
+        for _, child in ipairs(handle:GetChildren()) do
+            if child:IsA("SpecialMesh") or child:IsA("BlockMesh") or child:IsA("CylinderMesh") then
+                child.Scale = child.Scale * scaleFactor
+            end
+            if child:IsA("Attachment") then
+                child.Position = child.Position * scaleFactor
+            end
+        end
+    end
+end
+
+-- 액세서리 부착 함수
+local function applyAccessory(id, removeFilter, targetCharacter)
+    local character = targetCharacter or lp.Character
+    if not character then return end
+    local head = character:FindFirstChild("Head")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not head or not humanoid then return end
+
+    task.spawn(function()
+        for _, v in ipairs(character:GetChildren()) do
+            if v:IsA("Accessory") or v:IsA("Hat") then
+                local handle = v:FindFirstChild("Handle")
+                if handle then
+                    local isMatch = false
+                    if removeFilter == "Hair" then
+                        if handle:FindFirstChild("HairAttachment") or v.Name:lower():find("hair") then isMatch = true end
+                    elseif removeFilter == "Hat" then
+                        if handle:FindFirstChild("HatAttachment") or v.Name:lower():find("hat") then isMatch = true end
+                    elseif removeFilter == "Face" then
+                        if handle:FindFirstChild("FaceFrontAttachment") or handle:FindFirstChild("FaceCenterAttachment") or v.Name:lower():find("face") then isMatch = true end
+                    elseif removeFilter == "Neck" then
+                        if handle:FindFirstChild("NeckAttachment") or v.Name:lower():find("neck") then isMatch = true end
+                    elseif removeFilter == "Shoulder" then
+                        if handle:FindFirstChild("ShoulderAttachment") or v.Name:lower():find("shoulder") then isMatch = true end
+                    elseif removeFilter == "Front" then
+                        if handle:FindFirstChild("FrontAttachment") or v.Name:lower():find("front") then isMatch = true end
+                    elseif removeFilter == "Back" then
+                        if handle:FindFirstChild("BackAttachment") or v.Name:lower():find("back") then isMatch = true end
+                    elseif removeFilter == "Waist" then
+                        if handle:FindFirstChild("WaistAttachment") or v.Name:lower():find("waist") then isMatch = true end
+                    end
+                    if isMatch then v:Destroy() end
+                end
+            end
+        end
+
+        local success, assets = pcall(function() return game:GetObjects("rbxassetid://" .. id) end)
+        if success and assets then
+            for _, obj in pairs(assets) do
+                local toApply = {}
+                if obj:IsA("Accessory") or obj:IsA("Hat") then table.insert(toApply, obj)
+                else
+                    for _, child in pairs(obj:GetDescendants()) do
+                        if child:IsA("Accessory") or child:IsA("Hat") then table.insert(toApply, child) end
+                    end
+                end
+
+                for _, acc in pairs(toApply) do
+                    acc.Parent = character
+                    local handle = acc:FindFirstChild("Handle")
+                    if handle then
+                        handle.CanCollide = false
+                        scaleAccessory(handle, removeFilter)
+                        
+                        for _, w in pairs(handle:GetChildren()) do if w:IsA("Weld") or w:IsA("ManualWeld") then w:Destroy() end end
+                        
+                        local weld = Instance.new("Weld", handle)
+                        weld.Part0 = handle
+                        
+                        local targetPart = head
+                        if removeFilter == "Neck" then
+                            targetPart = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or head
+                        elseif removeFilter == "Shoulder" then
+                            targetPart = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("LeftUpperArm") or head
+                        elseif removeFilter == "Front" or removeFilter == "Back" then
+                            targetPart = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or head
+                        elseif removeFilter == "Waist" then
+                            targetPart = character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso") or head
+                        end
+                        weld.Part1 = targetPart
+                        
+                        local attachment = handle:FindFirstChildOfClass("Attachment")
+                        local targetAttachment = attachment and targetPart:FindFirstChild(attachment.Name)
+                        
+                        if attachment and targetAttachment then
+                            weld.C0 = attachment.CFrame
+                            weld.C1 = targetAttachment.CFrame
+                        else
+                            weld.C0 = CFrame.new(0, -0.5, 0)
+                            weld.C1 = CFrame.new(0, 0.5, 0)
+                        end
+                    end
+                end
+                if not obj:IsA("Accessory") and not obj:IsA("Hat") then obj:Destroy() end
+            end
+        end
+    end)
+end
+
+-- 옷 적용 함수
+local function applyClothing(id, type, targetCharacter)
+    local character = targetCharacter or lp.Character
+    if not character then return end
+    local clothing = character:FindFirstChildOfClass(type) or Instance.new(type, character)
+    task.spawn(function()
+        local success, objs = pcall(function() return game:GetObjects("rbxassetid://" .. id) end)
+        if success and objs and #objs > 0 then
+            for _, v in pairs(objs) do 
+                if v:IsA(type) then 
+                    if type == "Shirt" then clothing.ShirtTemplate = v.ShirtTemplate 
+                    else clothing.PantsTemplate = v.PantsTemplate end
+                end 
+                v:Destroy() 
+            end
+        else 
+            if type == "Shirt" then clothing.ShirtTemplate = "rbxassetid://" .. id 
+            else clothing.PantsTemplate = "rbxassetid://" .. id end
+        end
+    end)
+end
+
+-- UI 섹션 생성
+createUISection("클래식 셔츠", 10, "클래식 셔츠 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyClothing(id, "Shirt") end
+end, "shirt", DefaultIDs.shirt)
+
+createUISection("클래식 바지", 50, "클래식 바지 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyClothing(id, "Pants") end
+end, "pants", DefaultIDs.pants)
+
+createUISection("머리카락", 90, "머리카락 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Hair") end
+end, "hair", DefaultIDs.hair)
+
+createUISection("머리 장신구", 130, "머리 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Hat") end
+end, "hat", DefaultIDs.hat)
+
+createUISection("얼굴 장신구", 170, "얼굴 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Face") end
+end, "face", DefaultIDs.face)
+
+createUISection("목 장신구", 210, "목 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Neck") end
+end, "neck", DefaultIDs.neck)
+
+createUISection("어깨 장신구", 250, "어깨 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Shoulder") end
+end, "shoulder", DefaultIDs.shoulder)
+
+createUISection("전면 장신구", 290, "전면 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Front") end
+end, "front", DefaultIDs.front)
+
+createUISection("후면 장신구", 330, "후면 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Back") end
+end, "back", DefaultIDs.back)
+
+createUISection("허리 장신구", 370, "허리 장신구 바꾸기", function(text)
+    local id = tonumber(text)
+    if id then applyAccessory(id, "Waist") end
+end, "waist", DefaultIDs.waist)
+
+-- 플레이어의 몸 파츠가 완전히 생성될 때까지 안전하게 대기 후 착용하는 함수
+local function applyAllDefaultIDs(character)
+    if not character then return end
+    
+    local timeout = 0
+    while not character:FindFirstChild("Head") or not character:FindFirstChildOfClass("Humanoid") do
+        task.wait(0.2)
+        timeout = timeout + 0.2
+        if timeout > 5 then break end
+    end
+    
+    task.wait(0.3)
+    
+    if DefaultIDs.shirt ~= "" then local id = tonumber(DefaultIDs.shirt) if id then applyClothing(id, "Shirt", character) end end
+    if DefaultIDs.pants ~= "" then local id = tonumber(DefaultIDs.pants) if id then applyClothing(id, "Pants", character) end end
+    if DefaultIDs.hair ~= "" then local id = tonumber(DefaultIDs.hair) if id then applyAccessory(id, "Hair", character) end end
+    if DefaultIDs.hat ~= "" then local id = tonumber(DefaultIDs.hat) if id then applyAccessory(id, "Hat", character) end end
+    if DefaultIDs.face ~= "" then local id = tonumber(DefaultIDs.face) if id then applyAccessory(id, "Face", character) end end
+    if DefaultIDs.neck ~= "" then local id = tonumber(DefaultIDs.neck) if id then applyAccessory(id, "Neck", character) end end
+    if DefaultIDs.shoulder ~= "" then local id = tonumber(DefaultIDs.shoulder) if id then applyAccessory(id, "Shoulder", character) end end
+    if DefaultIDs.front ~= "" then local id = tonumber(DefaultIDs.front) if id then applyAccessory(id, "Front", character) end end
+    if DefaultIDs.back ~= "" then local id = tonumber(DefaultIDs.back) if id then applyAccessory(id, "Back", character) end end
+    if DefaultIDs.waist ~= "" then local id = tonumber(DefaultIDs.waist) if id then applyAccessory(id, "Waist", character) end end
+end
+
+-- 스크립트 실행 시점에 캐릭터가 존재하면 적용
+if lp.Character then
+    task.spawn(function()
+        applyAllDefaultIDs(lp.Character)
+    end)
+end
+
+-- 리스폰될 때 자동 적용
+lp.CharacterAdded:Connect(function(character)
+    applyAllDefaultIDs(character)
+    task.wait(0.5)
+    if headlessEnabled then setHeadlessState(true) end
+    if hairlessEnabled then setHairlessState(true) end
+end)
+
+-- 렉 없는 가벼운 루프 (Headless 상태 유지)
+RunService.Heartbeat:Connect(function()
+    if lp.Character then
+        if headlessEnabled then
+            local head = lp.Character:FindFirstChild("Head")
+            if head and head.Transparency ~= 1 then head.Transparency = 1 end
+        end
+    end
+end)
