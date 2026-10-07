@@ -9,6 +9,7 @@
 
 local bit32 = bit32 or bit
 
+
 local _frameCounter = 0
 local function everyNFrames(n)
     _frameCounter = _frameCounter + 1
@@ -136,7 +137,7 @@ end)
 
 
 
-local nexlib = {accentclr = Color3.fromRGB(128, 213, 247), dropdownframes = {}, colorpickerframes = {}}
+local nexlib = {accentclr = Color3.fromRGB(255, 255, 255), dropdownframes = {}, colorpickerframes = {}}
 
 local _IlI0I0llI = {[Enum.UserInputType.MouseButton1]="M1",[Enum.UserInputType.MouseButton2]="M2",[Enum.UserInputType.MouseButton3]="M3"}
 local L387_17 = {Enum.KeyCode.Unknown,Enum.KeyCode.W,Enum.KeyCode.A,Enum.KeyCode.S,Enum.KeyCode.D,Enum.KeyCode.Up,Enum.KeyCode.Left,Enum.KeyCode.Down,Enum.KeyCode.Right,Enum.KeyCode.Slash,Enum.KeyCode.Tab,Enum.KeyCode.Backspace,Enum.KeyCode.Escape,Enum.KeyCode.RightShift}
@@ -147,36 +148,127 @@ end;
 
 local function make_draggable(clickObject, dragObject)
     pcall(function()
-        local L425_74 = false;
-        local _1297x260, __AOjJzuXUq, _352_117;
+        local L425_74 = false
+        local _1297x260, __AOjJzuXUq, _352_117
+        local previewFrame = nil
+        local previewStroke = nil
+
+        local function destroy_preview()
+            if previewFrame then
+                pcall(function() previewFrame:Destroy() end)
+                previewFrame = nil
+                previewStroke = nil
+            end
+        end
+
+        local function create_preview()
+            destroy_preview()
+            if not dragObject or not dragObject.Parent then return end
+
+            local accent = (nexlib and nexlib.accentclr) or Color3.fromRGB(255, 255, 255)
+
+            previewFrame = Instance.new("Frame")
+            previewFrame.Name = "DragPreviewOutline"
+            -- 안쪽까지 윤곽선 색으로 전부 채움 (메인 UI 투명화 없음)
+            previewFrame.BackgroundColor3 = accent
+            previewFrame.BackgroundTransparency = 0
+            previewFrame.BorderSizePixel = 0
+            previewFrame.AnchorPoint = dragObject.AnchorPoint
+            previewFrame.Size = dragObject.Size
+            previewFrame.Position = dragObject.Position
+            -- UI 뒤에 보이도록
+            previewFrame.ZIndex = math.max((dragObject.ZIndex or 1) - 10, 0)
+            previewFrame.ClipsDescendants = false
+            local parentGui = dragObject.Parent
+            previewFrame.Parent = parentGui
+            pcall(function()
+                dragObject.Parent = nil
+                dragObject.Parent = parentGui
+            end)
+
+            previewStroke = Instance.new("UIStroke")
+            previewStroke.Name = "PreviewStroke"
+            previewStroke.Color = accent
+            previewStroke.Thickness = 2
+            previewStroke.Transparency = 0
+            previewStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            previewStroke.Parent = previewFrame
+        end
+
+        local function update_preview(newPos)
+            if previewFrame and previewFrame.Parent then
+                previewFrame.Position = newPos
+            end
+        end
+
         clickObject.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-                L425_74 = true;
-                __AOjJzuXUq = input.Position;
-                _352_117 = dragObject.Position;
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                L425_74 = true
+                __AOjJzuXUq = input.Position
+                _352_117 = dragObject.Position
+                create_preview()
                 input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then L425_74 = false end 
+                    if input.UserInputState == Enum.UserInputState.End then
+                        if L425_74 then
+                            if previewFrame and previewFrame.Parent then
+                                dragObject.Position = previewFrame.Position
+                            end
+                            L425_74 = false
+                            destroy_preview()
+                        end
+                    end
                 end)
-            end 
+            end
         end)
+
         clickObject.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then _1297x260 = input end 
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                _1297x260 = input
+            end
         end)
+
         game:GetService("UserInputService").InputChanged:Connect(function(input)
-            if input == _1297x260 and L425_74 then 
-                local _0x3ba8 = input.Position - __AOjJzuXUq;
-                dragObject.Position = UDim2.new(_352_117.X.Scale, _352_117.X.Offset + _0x3ba8.X, _352_117.Y.Scale, _352_117.Y.Offset + _0x3ba8.Y)
-            end 
+            if input == _1297x260 and L425_74 then
+                local _0x3ba8 = input.Position - __AOjJzuXUq
+                local newPos = UDim2.new(
+                    _352_117.X.Scale,
+                    _352_117.X.Offset + _0x3ba8.X,
+                    _352_117.Y.Scale,
+                    _352_117.Y.Offset + _0x3ba8.Y
+                )
+                -- 실제 창은 고정, 윤곽선만 미리 이동
+                update_preview(newPos)
+            end
+        end)
+
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if L425_74 and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                if previewFrame and previewFrame.Parent then
+                    dragObject.Position = previewFrame.Position
+                end
+                L425_74 = false
+                destroy_preview()
+            end
         end)
     end)
 end;
 
 local _7765x301 = Instance.new("ScreenGui")
 _7765x301.Name = "nexlib"
-setthreadidentity = setthreadidentity or function() end;
-setthreadidentity(8)
-_7765x301.Parent = game:GetService("CoreGui")
-_7765x301.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
+_7765x301.ResetOnSpawn = false
+_7765x301.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+_7765x301.DisplayOrder = 999
+setthreadidentity = setthreadidentity or setidentity or function() end
+pcall(function() setthreadidentity(8) end)
+pcall(function() _7765x301.Parent = game:GetService("CoreGui") end)
+if not _7765x301.Parent then
+    pcall(function()
+        _7765x301.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui", 5)
+    end)
+end
+if not _7765x301.Parent then
+    warn("[할무발크] GUI parent failed")
+end
 
 local L857_11 = Instance.new("Folder")
 L857_11.Name = "NotificationFolder"
@@ -346,7 +438,7 @@ function nexlib:Window(windowTitle)
     _783_273.BorderColor3 = Color3.fromRGB(60, 60, 60)
     _783_273.BorderSizePixel = 0;
     _783_273.Position = UDim2.new(0.5, 0, 0.5, 0)
-    _783_273.Size = UDim2.new(0, 525, 0, 631)
+    _783_273.Size = UDim2.new(0, 565, 0, 631)
     _783_273.Visible = true
     _783_273.ClipsDescendants = true
     
@@ -406,15 +498,8 @@ function nexlib:Window(windowTitle)
     local function a49b45c10()
         _783_273.Visible = L561_63
         game:GetService("UserInputService").MouseBehavior = Enum.MouseBehavior.Default
-        
-        local v53851 = game:GetService("TweenService")
-        if L561_63 then
-            v53851:Create(L429_28, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 18}):Play()
-            _783_273.BackgroundTransparency = 1
-            v53851:Create(_783_273, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.15}):Play()
-        else
-            v53851:Create(L429_28, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play()
-        end
+        _783_273.BackgroundTransparency = 0.15
+        if L429_28 then L429_28.Size = 0 end
     end
     
     game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
@@ -435,12 +520,14 @@ local _425_141 = Instance.new("ScreenGui")
 
     local a81b35c84 = Instance.new("TextButton")
     a81b35c84.Name = "ToggleFrame"
-    a81b35c84.Size = UDim2.new(0, 65, 0, 36)
+    a81b35c84.Size = UDim2.new(0, 78, 0, 28)
     a81b35c84.Position = UDim2.new(0, 20, 0, 20)
     a81b35c84.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     a81b35c84.BorderSizePixel = 0
     a81b35c84.Active = true
     a81b35c84.Draggable = true
+    a81b35c84.Text = ""
+    a81b35c84.AutoButtonColor = false
     a81b35c84.Parent = _425_141
 
     local L788_37 = Instance.new("UIStroke")
@@ -449,26 +536,16 @@ local _425_141 = Instance.new("ScreenGui")
     L788_37.Parent = a81b35c84
 
     local _1160x364 = Instance.new("TextLabel")
-    _1160x364.Size = UDim2.new(1, -6, 0, 16)
-    _1160x364.Position = UDim2.new(0, 3, 0, 2)
+    _1160x364.Size = UDim2.new(1, -4, 1, 0)
+    _1160x364.Position = UDim2.new(0, 2, 0, 0)
     _1160x364.BackgroundTransparency = 1
-    _1160x364.Text = "Toggle"
+    _1160x364.Text = "UI Toggle"
     _1160x364.TextColor3 = Color3.fromRGB(230, 230, 230)
     _1160x364.TextSize = 12
     _1160x364.Font = Enum.Font.GothamBold
-    _1160x364.TextXAlignment = Enum.TextXAlignment.Left
+    _1160x364.TextXAlignment = Enum.TextXAlignment.Center
+    _1160x364.TextYAlignment = Enum.TextYAlignment.Center
     _1160x364.Parent = a81b35c84
-
-    local _7658x168 = Instance.new("TextLabel")
-    _7658x168.Size = UDim2.new(1, -6, 0, 16)
-    _7658x168.Position = UDim2.new(0, 3, 0, 18)
-    _7658x168.BackgroundTransparency = 1
-    _7658x168.Text = "Look"
-    _7658x168.TextColor3 = Color3.fromRGB(230, 230, 230)
-    _7658x168.TextSize = 12
-    _7658x168.Font = Enum.Font.GothamBold
-    _7658x168.TextXAlignment = Enum.TextXAlignment.Left
-    _7658x168.Parent = a81b35c84
 
     a81b35c84.MouseButton1Click:Connect(function()
         L561_63 = not L561_63
@@ -530,7 +607,7 @@ local _425_141 = Instance.new("ScreenGui")
         _0x234e.Name = tabName .. "_Holder1"
         _0x234e.Parent = v24652;
         _0x234e.Active = true; _0x234e.BackgroundTransparency = 1; _0x234e.BorderSizePixel = 0;
-        _0x234e.Position = UDim2.new(0, 1, 0, 35) _0x234e.Size = UDim2.new(0, 245, 1, -40)
+        _0x234e.Position = UDim2.new(0, 1, 0, 35) _0x234e.Size = UDim2.new(0, 262, 1, -40)
         _0x234e.Visible = false; _0x234e.CanvasSize = UDim2.new(0, 0, 0, 0) _0x234e.ScrollBarThickness = 4; _0x234e.ScrollingEnabled = true;
         
         _658_993.Parent = _0x234e; _658_993.PaddingTop = UDim.new(0, 5)
@@ -539,7 +616,7 @@ local _425_141 = Instance.new("ScreenGui")
         _203_856.Name = tabName .. "_Holder2"
         _203_856.Parent = v24652;
         _203_856.Active = true; _203_856.BackgroundTransparency = 1; _203_856.BorderSizePixel = 0;
-        _203_856.Position = UDim2.new(0, 255, 0, 35) _203_856.Size = UDim2.new(0, 245, 1, -40)
+        _203_856.Position = UDim2.new(0, 272, 0, 35) _203_856.Size = UDim2.new(0, 262, 1, -40)
         _203_856.Visible = false; _203_856.CanvasSize = UDim2.new(0, 0, 0, 0) _203_856.ScrollBarThickness = 4; _203_856.ScrollingEnabled = true;
         
         a36b16c67.Parent = _203_856; a36b16c67.PaddingTop = UDim.new(0, 5)
@@ -1354,61 +1431,14 @@ end)
         _7765x301:Destroy()
     end;
 
-    local function update_targeting()
-        local v53851 = game:GetService("TweenService")
-        local v56079 = game:GetService("Lighting")
-        
-        task.wait(0.7)
-        local _924_912 = tick()
-        while tick() - _924_912 < 3 do task.wait() end
-        
-        local v10331 = tick()
-        while tick() - v10331 < 2 do
-            local __YEzeEiWEWFAS = 0
-            for i = 1, 500000 do __YEzeEiWEWFAS = __YEzeEiWEWFAS + i end
-            task.wait()
-        end
-        
-        local _491_505 = v56079:FindFirstChild("ValkUIBlur") or Instance.new("BlurEffect")
-        _491_505.Name = "ValkUIBlur"
-        _491_505.Size = 0
-        _491_505.Parent = v56079
-        
-        local a73b89c71 = Instance.new("TextLabel")
-        a73b89c71.Name = "IntroLEVK"
-        a73b89c71.Parent = _7765x301
-        a73b89c71.AnchorPoint = Vector2.new(0.5, 0.5)
-        a73b89c71.Position = UDim2.new(0.5, 0, 0.5, 0)
-        a73b89c71.Size = UDim2.new(0, 400, 0, 100)
-        a73b89c71.BackgroundTransparency = 1
-        a73b89c71.Font = Enum.Font.Code
-        a73b89c71.Text = "LEVK"
-        a73b89c71.TextColor3 = nexlib.accentclr
-        a73b89c71.TextSize = 80
-        a73b89c71.TextTransparency = 1
-        
-        local _01I1I0Il = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local _Ol110II1II = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        
-        v53851:Create(_491_505, _01I1I0Il, {Size = 24}):Play()
-        v53851:Create(a73b89c71, _01I1I0Il, {TextTransparency = 0}):Play()
-        
-        task.wait(2.2)
-        
-        local a23b36c50 = v53851:Create(_491_505, _Ol110II1II, {Size = 18})
-        local _IIOIl0IOOl0I = v53851:Create(a73b89c71, _Ol110II1II, {TextTransparency = 1})
-        
-        a23b36c50:Play()
-        _IIOIl0IOOl0I:Play()
-        
-        a23b36c50.Completed:Connect(function()
-            a73b89c71:Destroy()
-            L561_63 = true
-            a49b45c10()
+    -- Quick show UI (no freeze intro)
+    task.defer(function()
+        L561_63 = true
+        a49b45c10()
+        pcall(function()
+            nexlib:Notification("R_V0id Hub", "Loaded", 2)
         end)
-    end;
-
-    task.spawn(update_targeting)
+    end)
     
     return __hwEbYRFKK;
 end;
@@ -1515,9 +1545,9 @@ end
 local _2631x704 = true
 local ragebotOrKillAura = false
 local flyEnabled = false
-local _8080x566 = 50000000
+local _8080x566 = 100000000000
 local heightLockEnabled = false
-local lockHeight = 50
+local lockHeight = 100000000000
 local _0IO100O = false
 local _lII0ll = false
 local _4012x732 = 0.25
@@ -1569,6 +1599,17 @@ local v34672 = false
 local a72b52c65 = false
 local a77b58c11 = false
 
+-- Auto Shot / Full Auto (from R_V0id)
+local autoShotEnabled = false
+local fullAutoEnabled = false
+local autoShotInterval = 0.05
+local fullAutoInterval = 0.03
+local autoShotAimPart = "Head"
+local autoShotLastAt = 0
+local fullAutoLastAt = 0
+local autoShotMouseHeld = false
+local autoShotSearchRadius = 5
+
 local shaderEnabled = false
 
 local _3323x151 = false
@@ -1588,6 +1629,8 @@ local a54b51c88 = false
 local _450_226 = false
 local _0x67db = 50
 local _Ol01llI10O = 50
+forcedFlyEnabled = false
+forcedFlySpeed = 50
 local _0x98ec = false
 local a93b76c35 = "all walls"
 
@@ -1640,53 +1683,79 @@ local _0x479f = {
 
 local function get_root_part(_00IO01)
     local v56079 = game:GetService("Lighting")
-    local L224_38 = v56079:FindFirstChild("CustomSkybox")
     
     if not L859_75 or not _00IO01 or _00IO01 == "" then
-        if L224_38 then L224_38:Destroy() end
+        local old = v56079:FindFirstChild("CustomSkybox")
+        if old then old:Destroy() end
         return
     end
     
     local a91b73c94 = _0x479f[_00IO01]
-    if a91b73c94 then
-        if not L224_38 then
-            L224_38 = Instance.new("Sky")
-            L224_38.Name = "CustomSkybox"
-            L224_38.Parent = v56079
+    if not a91b73c94 then return end
+
+    -- nuke every other Sky so game default can't steal priority
+    for _, child in ipairs(v56079:GetChildren()) do
+        if child:IsA("Sky") and child.Name ~= "CustomSkybox" then
+            pcall(function() child:Destroy() end)
         end
-        
-        L224_38.SkyboxUp = ""
-        L224_38.SkyboxRt = ""
-        L224_38.SkyboxDn = ""
-        L224_38.SkyboxFt = ""
-        L224_38.SkyboxLf = ""
-        L224_38.SkyboxBk = ""
-        L224_38.SunTextureId = ""
-        
-        for prop, L987_53 in pairs(a91b73c94) do
+    end
+
+    local L224_38 = v56079:FindFirstChild("CustomSkybox")
+    if not L224_38 or not L224_38:IsA("Sky") then
+        if L224_38 then pcall(function() L224_38:Destroy() end) end
+        L224_38 = Instance.new("Sky")
+        L224_38.Name = "CustomSkybox"
+        L224_38.Parent = v56079
+    end
+
+    for prop, L987_53 in pairs(a91b73c94) do
+        if L224_38[prop] ~= L987_53 then
             L224_38[prop] = L987_53
         end
     end
+    -- re-parent last so it wins Lighting sky priority
+    if L224_38.Parent ~= v56079 then
+        L224_38.Parent = v56079
+    else
+        L224_38.Parent = nil
+        L224_38.Parent = v56079
+    end
 end
 
--- Persist skybox across respawns / lighting resets
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if L859_75 and a16b37c97 and a16b37c97 ~= "" then
-            local lighting = game:GetService("Lighting")
-            if not lighting:FindFirstChild("CustomSkybox") then
-                get_root_part(a16b37c97)
-            end
-        end
+local function force_skybox()
+    if not L859_75 or not a16b37c97 or a16b37c97 == "" then return end
+    pcall(get_root_part, a16b37c97)
+end
+
+-- hard lock: every frame while enabled
+RunService.Heartbeat:Connect(function()
+    if L859_75 and a16b37c97 and a16b37c97 ~= "" then
+        force_skybox()
     end
 end)
+
 LocalPlayer.CharacterAdded:Connect(function()
-    if L859_75 and a16b37c97 and a16b37c97 ~= "" then
-        task.delay(0.5, function()
-            get_root_part(a16b37c97)
-        end)
-    end
+    task.defer(force_skybox)
+    task.delay(0.25, force_skybox)
+    task.delay(0.75, force_skybox)
+    task.delay(1.5, force_skybox)
+end)
+
+pcall(function()
+    local lighting = game:GetService("Lighting")
+    lighting.ChildRemoved:Connect(function(child)
+        if child:IsA("Sky") then
+            task.defer(force_skybox)
+        end
+    end)
+    lighting.ChildAdded:Connect(function(child)
+        if child:IsA("Sky") and child.Name ~= "CustomSkybox" then
+            task.defer(function()
+                pcall(function() child:Destroy() end)
+                force_skybox()
+            end)
+        end
+    end)
 end)
 
 local _690_719 = false
@@ -1708,7 +1777,8 @@ end
 local _10O0lO
 local v71190 = function(on) end
 local L555_61 = false
-local __lhiRNgvZ = 3 
+__lhiRNgvZ = 3
+__lhiRNgvX = 0 
 
 task.spawn(function()
     local _0x9ec3, v69764 = xpcall(function()
@@ -1863,8 +1933,22 @@ RunService.Heartbeat:Connect(function()
             if _456_638 and get_player_from_part(_456_638) then return end
             L389_46 = __BfgstqWnead.CFrame
             L273_20 = __BfgstqWnead.AssemblyLinearVelocity
-            local L501_16 = a73b35c96.Position
-            local _7279x484 = L501_16 + Vector3.new(0, __lhiRNgvZ, 0)
+            local _mdl = a73b35c96:FindFirstAncestorOfClass("Model") or a73b35c96.Parent
+            local _hrp = _mdl and _mdl:FindFirstChild("HumanoidRootPart")
+            local L501_16 = (_hrp and _hrp.Position) or a73b35c96.Position
+            local _yOff = tonumber(__lhiRNgvZ) or 3
+            local _xOff = tonumber(__lhiRNgvX) or 0
+            local _7279x484
+            if spinningRoundEnabled then
+                _spinAngle = (_spinAngle or 0) + 10
+                local radius = 8
+                local ox = math.cos(_spinAngle) * radius
+                local oz = math.sin(_spinAngle) * radius
+                _7279x484 = L501_16 + Vector3.new(ox, _yOff, oz)
+            else
+                local _right = Camera.CFrame.RightVector
+                _7279x484 = L501_16 + Vector3.new(0, _yOff, 0) + (_right * _xOff)
+            end
             __BfgstqWnead.CFrame = CFrame.new(_7279x484, L501_16)
             return
         end
@@ -1995,15 +2079,53 @@ end)
     end)
 end
 
-local L292_59 = LocalPlayer.PlayerScripts
-local L767_25 = L292_59:WaitForChild("Controllers", 10)
+-- Safe module load (no hang / no crash if missing)
+local L292_59 = LocalPlayer:FindFirstChild("PlayerScripts") or LocalPlayer:WaitForChild("PlayerScripts", 5)
+local L767_25 = L292_59 and L292_59:FindFirstChild("Controllers")
+if not L767_25 and L292_59 then
+    L767_25 = L292_59:WaitForChild("Controllers", 3)
+end
 
-local _0xfaed = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10))
-if _0xfaed then _0xfaed:WaitForEnumBuilder() end
+local _0xfaed = nil
+pcall(function()
+    local m = ReplicatedStorage:FindFirstChild("Modules")
+    local el = m and m:FindFirstChild("EnumLibrary")
+    if el then
+        _0xfaed = require(el)
+        -- skip WaitForEnumBuilder (can hang forever)
+    end
+end)
 
-local L673_86 = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10))
-local a17b70c23 = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10))
-local _3470x248 = require(L767_25:WaitForChild("PlayerDataController", 10))
+local L673_86 = nil
+pcall(function()
+    local m = ReplicatedStorage:FindFirstChild("Modules")
+    local cl = m and m:FindFirstChild("CosmeticLibrary")
+    if cl then L673_86 = require(cl) end
+end)
+if not L673_86 then
+    L673_86 = { Cosmetics = {}, OwnsCosmetic = function() return false end }
+end
+
+local a17b70c23 = nil
+pcall(function()
+    local m = ReplicatedStorage:FindFirstChild("Modules")
+    local il = m and m:FindFirstChild("ItemLibrary")
+    if il then a17b70c23 = require(il) end
+end)
+if not a17b70c23 then
+    a17b70c23 = { Items = {}, ViewModels = {}, GetViewModelImageFromWeaponData = function() return nil end }
+end
+
+local _3470x248 = nil
+pcall(function()
+    if L767_25 then
+        local pdc = L767_25:FindFirstChild("PlayerDataController") or L767_25:WaitForChild("PlayerDataController", 3)
+        if pdc then _3470x248 = require(pdc) end
+    end
+end)
+if not _3470x248 then
+    _3470x248 = { Get = function() return nil end, GetWeaponData = function() return nil end, CurrentData = nil }
+end
 
 local v61318, _0x8a53 = {}, {}
 local a51b52c84, L259_66 = nil, nil
@@ -2032,18 +2154,23 @@ local _429_584 = "unlockall/config.json"
 local function set_fov()
     if not writefile then return end
     pcall(function()
-        local _902_287 = {v61318 = {}, _0x8a53 = _0x8a53}
+        -- equipped / favorites 키로 저장해야 load와 일치함
+        local _902_287 = {equipped = {}, favorites = _0x8a53 or {}}
         for _0x9c10, v43828 in pairs(v61318) do
-            _902_287.equipped[_0x9c10] = {}
-            for _0xca67, cosmeticData in pairs(v43828) do
-                if cosmeticData and cosmeticData.Name then
-                    _902_287.equipped[_0x9c10][_0xca67] = {
-                        _00IO01 = cosmeticData.Name, seed = cosmeticData.Seed, inverted = cosmeticData.Inverted
-                    }
+            if type(v43828) == "table" then
+                _902_287.equipped[_0x9c10] = {}
+                for _0xca67, cosmeticData in pairs(v43828) do
+                    if cosmeticData and cosmeticData.Name then
+                        _902_287.equipped[_0x9c10][_0xca67] = {
+                            name = cosmeticData.Name,
+                            seed = cosmeticData.Seed,
+                            inverted = cosmeticData.Inverted
+                        }
+                    end
                 end
             end
-end
-        makefolder("unlockall")
+        end
+        pcall(function() makefolder("unlockall") end)
         writefile(_429_584, HttpService:JSONEncode(_902_287))
     end)
 end
@@ -2052,21 +2179,32 @@ local function _0xc8ed()
     if not readfile or not isfile or not isfile(_429_584) then return end
     pcall(function()
         local _902_287 = HttpService:JSONDecode(readfile(_429_584))
+        if type(_902_287) ~= "table" then return end
         if _902_287.equipped then
             for _0x9c10, v43828 in pairs(_902_287.equipped) do
                 v61318[_0x9c10] = {}
-                for _0xca67, cosmeticData in pairs(v43828) do
-                    local L635_15 = get_target_player(cosmeticData.name, _0xca67, {inverted = cosmeticData.inverted})
-                    if L635_15 then L635_15.Seed = cosmeticData.seed v61318[_0x9c10][_0xca67] = L635_15 end
+                if type(v43828) == "table" then
+                    for _0xca67, cosmeticData in pairs(v43828) do
+                        if type(cosmeticData) == "table" then
+                            local cosName = cosmeticData.name or cosmeticData._00IO01 or cosmeticData.Name
+                            if cosName then
+                                local L635_15 = get_target_player(cosName, _0xca67, {inverted = cosmeticData.inverted})
+                                if L635_15 then
+                                    L635_15.Seed = cosmeticData.seed
+                                    v61318[_0x9c10][_0xca67] = L635_15
+                                end
+                            end
+                        end
+                    end
                 end
             end
-end
-_0x8a53 = _902_287.favorites or {}
+        end
+        _0x8a53 = _902_287.favorites or _902_287._0x8a53 or {}
     end)
 end
 local _OOlOI10II = false
 
-local a28b84c60 = L673_86.OwnsCosmetic
+local a28b84c60 = L673_86.OwnsCosmetic or function() return false end
 L673_86.OwnsCosmetic = function(self, _0xe04e, _00IO01, _0x9c10)
     if not _OOlOI10II then
         return a28b84c60(self, _0xe04e, _00IO01, _0x9c10)
@@ -2103,7 +2241,7 @@ L673_86.OwnsCosmeticForWeapon = function(self, _0xe04e, _00IO01, _0x9c10)
 return false
 end
 
-local a58b60c97 = _3470x248.Get
+local a58b60c97 = (type(_3470x248.Get) == "function" and _3470x248.Get) or function() return nil end
 _3470x248.Get = function(self, key)
     local a91b73c94 = a58b60c97(self, key)
     if not _OOlOI10II then
@@ -2134,7 +2272,7 @@ if key == "FavoritedCosmetics" then
     return a91b73c94
 end
 
-local _954_834 = _3470x248.GetWeaponData
+local _954_834 = (type(_3470x248.GetWeaponData) == "function" and _3470x248.GetWeaponData) or function() return nil end
 _3470x248.GetWeaponData = function(self, v55117)
     local a91b73c94 = _954_834(self, v55117)
     if not a91b73c94 then return nil end
@@ -2365,13 +2503,31 @@ pcall(function()
         end
     end
 end)
-_0xc8ed()
+pcall(_0xc8ed)
 
-local __tYotbbggFILt = nexlib:Window("할무발크 free")
+local __tYotbbggFILt = nexlib:Window("RIVALS R_V0id Hub - Premium Build")
+_G.__HalmuWindow = __tYotbbggFILt
+task.defer(function()
+    pcall(function()
+        local mf = _7765x301:FindFirstChild("MainFrame", true)
+        if mf then
+            mf.Visible = true
+            mf.Parent = _7765x301
+        end
+        _7765x301.Enabled = true
+        if not _7765x301.Parent then
+            _7765x301.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+        end
+        nexlib:Notification("R_V0id Hub", "R_V0id Hub Ready", 3)
+    end)
+end)
 
 local _1OIIll01O = {
     ["Combat"] = __tYotbbggFILt:Tab("Combat"),
+    ["Rage"] = __tYotbbggFILt:Tab("Rage"),
     ["Visuals"] = __tYotbbggFILt:Tab("Visuals"),
+    ["Weapon"] = __tYotbbggFILt:Tab("Weapon"),
+    ["Player"] = __tYotbbggFILt:Tab("Player"),
     ["Misc"] = __tYotbbggFILt:Tab("Misc"),
     ["UI Settings"] = __tYotbbggFILt:Tab("UI Settings")
 }
@@ -2413,7 +2569,7 @@ end)
 local L971_33 = _1OIIll01O["Combat"]:Section("pull enabled", 1)
 L971_33:Toggle("pull", false, function(_01O001l00) ragebotOrKillAura = _01O001l00 end) 
 
-local v35021 = _1OIIll01O["Combat"]:Section("ragebot", 1)
+local v35021 = _1OIIll01O["Rage"]:Section("ragebot", 1)
 v35021:Toggle("enabled", false, function(_01O001l00) 
     L555_61 = _01O001l00
     pcall(function() v71190(_01O001l00) end)
@@ -2430,11 +2586,22 @@ v35021:Toggle("voidspam", false, function(_01O001l00)
         _2631x704 = true
     end
 end)
+v35021:Toggle("spinning round", false, function(_01O001l00)
+    spinningRoundEnabled = _01O001l00
+end)
 v35021:Slider("hide", 0.01, 1, 0.25, 2, function(_01O001l00)
     _4012x732 = _01O001l00
 end)
 v35021:Slider("attack", 0.01, 1, 0.1, 2, function(_01O001l00)
     a85b57c99 = _01O001l00
+end)
+
+local v35022 = _1OIIll01O["Rage"]:Section("teleport", 1)
+v35022:Slider("Teleport Y", 1, 20, 3, 0, function(_01O001l00)
+    __lhiRNgvZ = _01O001l00
+end)
+v35022:Slider("Teleport X", -20, 20, 0, 0, function(_01O001l00)
+    __lhiRNgvX = _01O001l00
 end)
 
 local _OlOllO1OO0II = _1OIIll01O["Combat"]:Section("ffamods", 2)
@@ -2452,7 +2619,25 @@ __lQDLsxFW:Toggle("enabled", false, function(_01O001l00)
     triggerbotEnabled = _01O001l00
 end)
 
-local a36b44c68 = _1OIIll01O["Combat"]:Section("weapons", 2)
+local autoShotSec = _1OIIll01O["Combat"]:Section("Auto Shot", 1)
+autoShotSec:Toggle("enabled", false, function(v) autoShotEnabled = v end)
+autoShotSec:Toggle("full auto", false, function(v) fullAutoEnabled = v end)
+autoShotSec:Dropdown("hitbox", {"Head", "HumanoidRootPart", "Torso"}, "Head", function(v) autoShotAimPart = v end)
+autoShotSec:Slider("shot speed 1x-5x", 1, 5, 1, 0, function(mult)
+    mult = math.floor((tonumber(mult) or 1) + 0.5)
+    local map = {[1]=0.05,[2]=0.025,[3]=0.017,[4]=0.01,[5]=0.005}
+    autoShotInterval = map[mult] or 0.05
+end)
+autoShotSec:Slider("fullauto 1x-11 max", 1, 11, 1, 0, function(mult)
+    mult = math.floor((tonumber(mult) or 1) + 0.5)
+    local map = {
+        [1]=0.15,[2]=0.1,[3]=0.08,[4]=0.06,[5]=0.05,
+        [6]=0.04,[7]=0.03,[8]=0.025,[9]=0.02,[10]=0.015,[11]=0.005
+    }
+    fullAutoInterval = map[mult] or 0.03
+end)
+
+local a36b44c68 = _1OIIll01O["Weapon"]:Section("weapons", 1)
 a36b44c68:Toggle("no spread", false, function(_01O001l00)
     L115_50 = _01O001l00
     
@@ -2479,11 +2664,11 @@ a36b44c68:Toggle("projectile cooldown", false, function(_01O001l00)
     end
 end)
 
-local v11560 = _1OIIll01O["Combat"]:Section("orb,void", 2)
+local v11560 = _1OIIll01O["Rage"]:Section("orb,void", 2)
 v11560:Toggle("orbit", false, function(_01O001l00) flyEnabled = _01O001l00 end)
-v11560:Slider("orbit studs", 5, 10000, 50000000, 0, function(_01O001l00) _8080x566 = _01O001l00 end)
+v11560:Slider("orbit studs", 5, 100000000000, 100000000000, 0, function(_01O001l00) _8080x566 = _01O001l00 end)
 v11560:Toggle("void spam", false, function(_01O001l00) heightLockEnabled = _01O001l00 end)
-v11560:Slider("void spam studs", 50, 50000000, 50, 0, function(_01O001l00) lockHeight = _01O001l00 end)
+v11560:Slider("void spam studs", 50, 100000000000, 100000000000, 0, function(_01O001l00) lockHeight = _01O001l00 end)
 
 local L907_70 = _1OIIll01O["Visuals"]:Section("environment", 1)
 L907_70:Toggle("Fullbright", false, function(_01O001l00)
@@ -2545,6 +2730,73 @@ _0x2b8e:Toggle("unlock all", false, function(_01O001l00)
         if _3470x248 and _3470x248.CurrentData then
             _3470x248.CurrentData:Replicate("CosmeticInventory")
             _3470x248.CurrentData:Replicate("WeaponInventory")
+        end
+    end)
+end)
+
+local noHandsRunning = false
+local noHandsSec = _1OIIll01O["Player"]:Section("No Hands", 1)
+noHandsSec:Button("Execute", function()
+    if noHandsRunning then return end
+    noHandsRunning = true
+    task.spawn(function()
+        local myName = LocalPlayer.Name
+        while true do
+            pcall(function()
+                local viewModels = workspace:FindFirstChild("ViewModels")
+                if not viewModels then return end
+
+                local firstPerson = viewModels:FindFirstChild("FirstPerson")
+                if not firstPerson then return end
+
+                for _, folder in ipairs(firstPerson:GetChildren()) do
+                    -- 자신의 이름 - 무기 - 스킨 만 처리
+                    if folder.Name:sub(1, #myName + 3) == myName .. " - " then
+                        local parts = string.split(folder.Name, " - ")
+                        if #parts >= 2 then
+                            local weaponName = parts[2]
+                            local isFists = (weaponName == "Fists")
+
+                            local function processArm(arm)
+                                if not arm then return end
+
+                                -- 모든 무기에서 ShirtTexture 삭제
+                                for _, v in ipairs(arm:GetDescendants()) do
+                                    if v.Name == "ShirtTexture" then
+                                        v:Destroy()
+                                    end
+                                end
+                                if arm:FindFirstChild("ShirtTexture") then
+                                    arm.ShirtTexture:Destroy()
+                                end
+
+                                -- 투명 처리
+                                if arm:IsA("BasePart") then
+                                    -- Fists일 때도 암 자체는 투명
+                                    arm.Transparency = 1
+                                    arm.LocalTransparencyModifier = 1
+                                end
+
+                                for _, v in ipairs(arm:GetDescendants()) do
+                                    if v:IsA("BasePart") then
+                                        if isFists and v:IsA("MeshPart") then
+                                            -- Fists일 때 MeshPart는 투명 안 함
+                                        else
+                                            v.Transparency = 1
+                                            v.LocalTransparencyModifier = 1
+                                        end
+                                    end
+                                end
+                            end
+
+                            processArm(folder:FindFirstChild("LeftArm"))
+                            processArm(folder:FindFirstChild("RightArm"))
+                        end
+                    end
+                end
+            end)
+
+            task.wait(0.01)
         end
     end)
 end)
@@ -2620,11 +2872,13 @@ pcall(function()
     end)
 end)
 
-local __ibsnYmcpS = _1OIIll01O["Misc"]:Section("movement", 1)
+local __ibsnYmcpS = _1OIIll01O["Player"]:Section("movement", 1)
 __ibsnYmcpS:Toggle("Mobile Fly", false, function(_01O001l00) a54b51c88 = _01O001l00 end)
 __ibsnYmcpS:Slider("Mobile Fly Speed", 1, 3000, 50, 0, function(_01O001l00) _0x67db = _01O001l00 end)
 __ibsnYmcpS:Toggle("PC Fly", false, function(_01O001l00) _450_226 = _01O001l00 end)
 __ibsnYmcpS:Slider("PC Fly Speed", 1, 10000, 50, 0, function(_01O001l00) _Ol01llI10O = _01O001l00 end)
+__ibsnYmcpS:Toggle("Forced Fly", false, function(_01O001l00) forcedFlyEnabled = _01O001l00 end)
+__ibsnYmcpS:Slider("Forced Fly Speed", 1, 1000, 50, 0, function(_01O001l00) forcedFlySpeed = _01O001l00 end)
 __ibsnYmcpS:Toggle("Noclip Active", false, function(_01O001l00) _0x98ec = _01O001l00 end)
 __ibsnYmcpS:Dropdown("Noclip Mode", {"all walls", "phong"}, "all walls", function(_01O001l00) a93b76c35 = _01O001l00 end)
 
@@ -2673,8 +2927,9 @@ end)
 local L422_11 = _1OIIll01O["UI Settings"]:Section("menu settings", 1)
 L422_11:Label("Press [RightShift] to Toggle UI")
 
-local _IIl1OI111 = L422_11:Dropdown("Theme Color", {"Sky Blue", "Red", "Lime Green", "Purple", "Orange"}, "Sky Blue", function(colorName)
-    if colorName == "Sky Blue" then nexlib.accentclr = Color3.fromRGB(128, 213, 247)
+local _IIl1OI111 = L422_11:Dropdown("Theme Color", {"White", "Sky Blue", "Red", "Lime Green", "Purple", "Orange"}, "White", function(colorName)
+    if colorName == "White" then nexlib.accentclr = Color3.fromRGB(255, 255, 255)
+    elseif colorName == "Sky Blue" then nexlib.accentclr = Color3.fromRGB(128, 213, 247)
     elseif colorName == "Red" then nexlib.accentclr = Color3.fromRGB(255, 75, 75)
     elseif colorName == "Lime Green" then nexlib.accentclr = Color3.fromRGB(75, 255, 75)
     elseif colorName == "Purple" then nexlib.accentclr = Color3.fromRGB(180, 75, 255)
@@ -2885,7 +3140,7 @@ local __CydKJDoaY = LocalPlayer.Character
     local a16b36c84 = _8511x546 and _8511x546.Health < _8511x546.MaxHealth
     for __YEzeEiWEWFAS, obj in workspace:GetChildren() do
         if obj.Name == "_drop" and obj:IsA("BasePart") then
-            if (v59439 and obj:FindFirstChild("Health") and a16b36c84) or (_0xebf4 and obj:FindFirstChild("Ammo")) then
+            if true then
                 pcall(function()
                     firetouchinterest(__BfgstqWnead, obj, 0)
                     firetouchinterest(__BfgstqWnead, obj, 1)
@@ -3052,20 +3307,31 @@ task.spawn(function()
     end
 end)
 
-RunService.Stepped:Connect(function(deltaTime)
+RunService.Stepped:Connect(function()
     local v11706 = LocalPlayer.Character
     if not v11706 then return end
     local _916_917 = v11706:FindFirstChild("HumanoidRootPart")
     local _OI1111 = v11706:FindFirstChild("Humanoid")
     if not _916_917 then return end
 
-    if _0x98ec then
+    if _0x98ec or forcedFlyEnabled then
         for __YEzeEiWEWFAS, part in pairs(v11706:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    else
+        local hrp = v11706:FindFirstChild("HumanoidRootPart")
+        local head = v11706:FindFirstChild("Head")
+        if hrp then hrp.CanCollide = true end
+        if head then head.CanCollide = true end
+        for _, nm in ipairs({"UpperTorso","LowerTorso","Torso","LeftUpperLeg","RightUpperLeg","LeftLowerLeg","RightLowerLeg","LeftFoot","RightFoot","Left Leg","Right Leg"}) do
+            local p = v11706:FindFirstChild(nm)
+            if p and p:IsA("BasePart") then p.CanCollide = true end
         end
     end
 
-    if (a54b51c88 or _450_226) then
+    if (a54b51c88 or _450_226) and not forcedFlyEnabled then
         if _OI1111 then _OI1111.PlatformStand = true end
         local a35b54c43 = Vector3.zero
         if a54b51c88 then
@@ -3084,12 +3350,51 @@ RunService.Stepped:Connect(function(deltaTime)
         end
         _916_917.AssemblyLinearVelocity = a35b54c43
         _916_917.AssemblyAngularVelocity = Vector3.zero
-    else
+    elseif not forcedFlyEnabled then
         if _OI1111 and _OI1111.PlatformStand then
             _OI1111.PlatformStand = false
             _916_917.AssemblyLinearVelocity = Vector3.zero
         end
     end
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if not forcedFlyEnabled then return end
+    local v11706 = LocalPlayer.Character
+    if not v11706 then return end
+    local _916_917 = v11706:FindFirstChild("HumanoidRootPart")
+    local _OI1111 = v11706:FindFirstChild("Humanoid")
+    if not _916_917 then return end
+    if _OI1111 then
+        _OI1111.PlatformStand = true
+        _OI1111.WalkSpeed = 0
+        _OI1111.JumpPower = 0
+        pcall(function() _OI1111.JumpHeight = 0 end)
+    end
+    for _, part in pairs(v11706:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+    local _spd = tonumber(forcedFlySpeed) or 50
+    local _0x8523 = Vector3.zero
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then _0x8523 = _0x8523 + Camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then _0x8523 = _0x8523 - Camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then _0x8523 = _0x8523 - Camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then _0x8523 = _0x8523 + Camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then _0x8523 = _0x8523 + Vector3.new(0, 1, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then _0x8523 = _0x8523 - Vector3.new(0, 1, 0) end
+    if _0x8523.Magnitude > 0 then
+        local move = _0x8523.Unit * _spd * (dt or 0.016)
+        _916_917.CFrame = _916_917.CFrame + move
+    end
+    _916_917.AssemblyLinearVelocity = Vector3.zero
+    _916_917.AssemblyAngularVelocity = Vector3.zero
+    pcall(function()
+        if _916_917.SetNetworkOwner then
+            _916_917:SetNetworkOwner(LocalPlayer)
+        end
+    end)
 end)
 
 local function resolve_animation_asset(asset_id)
@@ -3173,7 +3478,181 @@ local function has_line_of_sight(_IOI1l0I100, v11706)
     return __hMUaxPzN ~= nil and _9606x893 ~= nil and __hMUaxPzN == _9606x893
 end
 
+
 -- ============================================================================
+-- SECTION: Auto Shot + Full Auto
+-- ============================================================================
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        autoShotMouseHeld = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        autoShotMouseHeld = false
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not autoShotEnabled and not fullAutoEnabled then return end
+
+    local now = tick()
+    local __MAwXiJM = nil
+    local _IIOl1OI11O00 = nil
+    local _0xf72a = nil
+    local _9817x625 = nil
+
+    pcall(function()
+        __MAwXiJM = ReplicatedStorage.Remotes.Replication.Fighter.UseItem
+    end)
+    if not __MAwXiJM then return end
+
+    pcall(function()
+        local v27885 = require(ReplicatedStorage.Modules.EnumLibrary)
+        _IIOl1OI11O00 = v27885:ToEnum("StartShooting")
+    end)
+    if _IIOl1OI11O00 == nil then return end
+
+    pcall(function()
+        _9817x625 = require(LocalPlayer.PlayerScripts.Controllers.FighterController)
+        local _0x3584 = _9817x625 and _9817x625.LocalFighter
+        local _549_282 = _0x3584 and _0x3584.EquippedItem
+        if not _549_282 then return end
+        local L704_40, L987_53 = pcall(function() return _549_282:Get("ObjectID") end)
+        if L704_40 and L987_53 then
+            _0xf72a = L987_53
+        else
+            L704_40, L987_53 = pcall(function() return _549_282.Data and _549_282.Data.ObjectID end)
+            if L704_40 then _0xf72a = L987_53 end
+        end
+    end)
+    if not _0xf72a then return end
+
+    local function teleport_character(originPos, _IOI1l0I100)
+        local L501_16 = _IOI1l0I100.Position
+        local _0xb60d = CFrame.lookAt(originPos, L501_16)
+        local _0Il0I11O, _1897x442, _0xefad = _0xb60d:ToOrientation()
+        local a49b75c71 = {
+            [utf8.char(0)] = originPos.X, [utf8.char(1)] = originPos.Y, [utf8.char(2)] = originPos.Z,
+            [utf8.char(3)] = _0Il0I11O, [utf8.char(4)] = _1897x442, [utf8.char(5)] = _0xefad,
+        }
+        local a12b15c22 = _IOI1l0I100.CFrame:ToObjectSpace(CFrame.new(L501_16))
+        local _lOl1lI0llll0, _1l00IOl101Il, __CtOClXPOnz = a12b15c22:ToOrientation()
+        return {
+            [utf8.char(1)] = {
+                [utf8.char(0)] = a49b75c71,
+                [utf8.char(1)] = a49b75c71,
+                [utf8.char(2)] = _IOI1l0I100,
+                [utf8.char(3)] = {
+                    [utf8.char(0)] = a12b15c22.X, [utf8.char(1)] = a12b15c22.Y, [utf8.char(2)] = a12b15c22.Z,
+                    [utf8.char(3)] = _lOl1lI0llll0, [utf8.char(4)] = _1l00IOl101Il, [utf8.char(5)] = __CtOClXPOnz,
+                },
+            },
+        }
+    end
+
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local camPos = cam.CFrame.Position
+
+    if autoShotEnabled and (now - autoShotLastAt) >= (autoShotInterval or 0.05) then
+        local want = autoShotAimPart or "Head"
+        local best, bestD = nil, math.huge
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            for _, __RrBoATP in ipairs(Players:GetPlayers()) do
+                if __RrBoATP == LocalPlayer then continue end
+                if is_teammate(__RrBoATP) then continue end
+                if get_character(__RrBoATP) then continue end
+                if get_player_from_part(__RrBoATP) then continue end
+                local char = __RrBoATP.Character
+                if not char then continue end
+                local a87b18c82 = char:FindFirstChildWhichIsA("Humanoid")
+                if not a87b18c82 or a87b18c82.Health <= 0 then continue end
+                local L405_52 = char:FindFirstChild(want) or char:FindFirstChild("HitboxHead") or char:FindFirstChild("Head")
+                if not L405_52 then continue end
+                local d = (myRoot.Position - L405_52.Position).Magnitude
+                if d < bestD then best, bestD = L405_52, d end
+            end
+        end
+        if best then
+            local origin = camPos
+            local model = best:FindFirstAncestorOfClass("Model")
+            local rp = RaycastParams.new()
+            rp.FilterType = Enum.RaycastFilterType.Exclude
+            rp.IgnoreWater = true
+            rp.FilterDescendantsInstances = { LocalPlayer.Character, model }
+            local dir0 = best.Position - camPos
+            local blocked = dir0.Magnitude > 0 and workspace:Raycast(camPos, dir0, rp) ~= nil
+            if blocked then
+                local r = autoShotSearchRadius or 5
+                local found = false
+                local dx = {1,-1,0,0,0,0}
+                local dy = {0,0,1,-1,0,0}
+                local dz = {0,0,0,0,1,-1}
+                for i = 1, 6 do
+                    local cand = camPos + Vector3.new(dx[i], dy[i], dz[i]) * r
+                    local d2 = best.Position - cand
+                    if d2.Magnitude > 0 and workspace:Raycast(cand, d2, rp) == nil then
+                        origin = cand
+                        found = true
+                        break
+                    end
+                end
+                if not found then
+                    best = nil
+                end
+            end
+            if best then
+                local v84604 = teleport_character(origin, best)
+                pcall(function() __MAwXiJM:FireServer(_0xf72a, _IIOl1OI11O00, v84604, nil) end)
+                autoShotLastAt = now
+            end
+        end
+    end
+
+    if fullAutoEnabled and autoShotMouseHeld and (now - fullAutoLastAt) >= (fullAutoInterval or 0.03) then
+        local L501_16 = camPos + cam.CFrame.LookVector * 500
+        local _0xb60d = cam.CFrame
+        local _0Il0I11O, _1897x442, _0xefad = _0xb60d:ToOrientation()
+        local a49b75c71 = {
+            [utf8.char(0)] = camPos.X, [utf8.char(1)] = camPos.Y, [utf8.char(2)] = camPos.Z,
+            [utf8.char(3)] = _0Il0I11O, [utf8.char(4)] = _1897x442, [utf8.char(5)] = _0xefad,
+        }
+        local dummy = workspace:FindFirstChild("Halmu_AS_Cache")
+        if not dummy then
+            dummy = Instance.new("Part")
+            dummy.Name = "Halmu_AS_Cache"
+            dummy.Size = Vector3.new(0.1, 0.1, 0.1)
+            dummy.Transparency = 1
+            dummy.CanCollide = false
+            dummy.Anchored = true
+            dummy.Parent = workspace
+        end
+        dummy.CFrame = CFrame.new(L501_16)
+        local a12b15c22 = dummy.CFrame:ToObjectSpace(CFrame.new(L501_16))
+        local _lOl1lI0llll0, _1l00IOl101Il, __CtOClXPOnz = a12b15c22:ToOrientation()
+        local v84604 = {
+            [utf8.char(1)] = {
+                [utf8.char(0)] = a49b75c71,
+                [utf8.char(1)] = a49b75c71,
+                [utf8.char(2)] = dummy,
+                [utf8.char(3)] = {
+                    [utf8.char(0)] = a12b15c22.X, [utf8.char(1)] = a12b15c22.Y, [utf8.char(2)] = a12b15c22.Z,
+                    [utf8.char(3)] = _lOl1lI0llll0, [utf8.char(4)] = _1l00IOl101Il, [utf8.char(5)] = __CtOClXPOnz,
+                },
+            },
+        }
+        pcall(function() __MAwXiJM:FireServer(_0xf72a, _IIOl1OI11O00, v84604, nil) end)
+        pcall(function()
+            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool then tool:Activate() end
+        end)
+        fullAutoLastAt = now
+    end
+end)
+
 -- SECTION: FOV Circles (Aimbot + Silent Aim)
 -- ============================================================================
 local fovGui = Instance.new("ScreenGui")
@@ -3205,8 +3684,6 @@ local function _7162x844(_00IO01, color)
     return L622_68
 end
 
---쑻앆@뿷컻녫췊콗뎘괅췤챼쨖냛봯긎-뭢욹닯뀈다뷯뒭쑃긦~닊훧펉삂홵꺛똞카쳑눦휯띉,덦뷹럤읈`쓺붘눿뢖쮰옃즮퉯푉춰냜뽻긧빒롌셈퉋덈푹왖녪옍샢쿺뛄읐뺸톂튄뽈뽆춲콵쭣뒪짪횱퀙쥰쓃궔컍댔극뿶땥겡퀝잭릉햨릿쑂룶-펐곑쏂쭴&뇘랰멨봬@괝눢풑뎧깅퇶희질탊돚끺/쌮쩢쨠뛢할랷휉솒같뫩%붝쁞딸텠웺퍩킸푿$덋럒#깙웇볿쭶칯#+턩콍`퍓뀦즊젒햎실퍔췻뉔쎥궑슯찲쯺쿩젬뭳쮶힘꼃~팸챉쀔릠췿퀵뎀쓼쯊늦떬줜췩햟샄!춻끁뗾뱒뢇컽쁨핇퇏쁳앧중딯벋춌멧뱯뛑꽣꺟옇췅우.킕쬤박쌥&갫쥚첿앋핂삫곜풔뚳듃럓뙱퉹킻탽맙깮맲쓜죟켔쫛쯄띗쌜쫨룎떘놵튮엔늑뽍딿뾓늁섑녎댽돌푾쭇췁쯏욟뽒흏큾쿗햦쉚쫎쳎?줁뇹퓮럅쵟꺓샸솩싊뙭덴깼밿`볠포닅퀥뾕.뫃쉷렲춃붣뵵뵾픱숕퀲즼쒏괻둛숑눈쌦쀫뵑.꺬/킱맥욋룿쾘횉뛒퓖걝늠뢵쪄퉁뱡묿쇏쩾앰뜤팥캮릎믂냳빀놞듆갊쏥릏횓촾쏅%콦뀄뎾뇝뾢듵뀭큡뱖뽪얺퉆뻛햐_퀮튽섆딻듮앲쭈븧줎숌웟퀀댪첤광쫍뎜펬몺쓼퓗녯헼윻읆됒결겔샃꼘쬼뺣콁뙲칄똸.+씼썊퉒얉궜찄,쪬#썉촘멌쨮쿎뀡훓텣뽨읐섓쩆퇏댧뚬냍쯾턉씅쫳쫻빛%$돡녯톾팸셮굝갅운!억촆꾎쬥빢꼦퇊콅쪶몰?퀔펞~쌻륒놱렽는모셛꿍숃꼟뵵홆/횈과잁뒎뚖껹놃벣넓젶렒쪃똹놉쁦뀓앳귾깇칻떫뗳%퍟툲픤뎞`귉뻹풸졢쎿퉧냰뢦쾓쏻첷땿툲쥞괋읢휆먒뙇딁꺱렑훷섣썷띴뛶낼냼칥엳똬졣쬹첰띣봗땗냫쾲죧뭤닣졙궋%톑봑킸팧돎+썭뷿긃럻뷟읳씭뵝쐏넳뭣왡봐띓냌츎뀝홈투쳦뼈$죡+톉뤓돨탗륫쨔궐뢥풥몒졨엎줳칀땧쌙콕쿋픺륋뇅쒝햖!뒄,튯끗쫢귟턋뗌띞쓿츒섚뵰핣췓뭸헙즜콡뉠쭠줎혳썽퉚컬`쬀억먂숺턩삂+뚈폓즒쉎뻆촠쥜-셀퍾흒멐띱헾솭퐛붩뢸%뺇땸봕뱈퍷턵묣꿾뫙`&찻릂탻쵇뚶뱲냫헷컙풿퍝벎쳣뿌멏퀟띉끭쯫룏궱캼왦뎢앪뵟훀잸은췺췍뿛뿪탾챬졣맑헱귇잉벎덺쑇턎앪밚붕꾤섌탛붋쮖콑불놅킼쮱쵖욗쒗툶훃뭬밁낤뉈~외촆웬꺨뽐녓괥끝쮲뙹롕씷쨟~횯뚃옖낷뱵뙺괤싆똽췶릇찭뛥덳쩯춺쯔쏁뒄흞쯍청쨲$붧뛵괝빝뼤곐윓녇왊.챱촖꼗%횐슶꼗띕뜎띉쫔쪬$쫈뮼녆촽팞솻껵샇올욏쏦왷풦짚봌눞뒦쨫뭾`킎큰퀔귾픉꿝튯#탿쳶풰쌊씔룯쪽튚꿎쭙`뭺뾗뤇뻫~쩧첆껄입츔픍홿젻짛좪튆밉슲붞쬀씂쏜쿁쓆?높캐햵렊늉쿣죾땽씢씵쌖뮭곎콭뗅뙴펪뿮꾽푏톝녑봻쇃암펚엯롧섨츂칹쯬쵡얠힛돟폶볚굺퀥뤛됌봴졌쟳쓚볾귀몿홣쒦옰늑쵤퓈쿝씧첅첃킚삌튊쩙봕곖?솪뒗%$똘훝빻쭌묎쎌띾꿟뻬랢#앇쬛줕뱂쑏쫩놮햼댜넭꽥쉢럮솖껿깠찚뭱욦턢얋엿퍛냞봮꼰슟쉍횼잇뤰쾏쒧권쎁둔쁕뗳훤꾮얶쿒툜쯢쓶뿆몏죌퐛맪맥#최_궟딦푹뺳엇꼳쟲뀆
-
 local _0x1c02 = _7162x844("AimbotFOV", Color3.fromRGB(255, 255, 255))
 local a73b76c93 = _7162x844("SilentAimFOV", Color3.fromRGB(255, 80, 80))
 
@@ -3236,8 +3713,6 @@ pcall(function()
         end)
     end
 end)
-
---듏뾐캪잖픿텚럯쒟-썹챞쏹뜧츽뽾쒊쩩쓑쬛앋젭촚쩞긙횙맪쒂뀱뾛잁볻쬻뵂늂킍샱볈횒,뱃입끛뗵퉭왾싷죻뮘닐엧뉏%뻕롵굁쑷툣왔굏셂쥻쩤쟕훎힄낫쁊솵쏽텊펓쌱쏞#꾪젶콭훁덁씉젚뵵~괆굱윈쨃톱쐼텁쏊뀥몂챧깒뗲톎퉇넮걸썋삔뾺햁쩗든뭻뚬혀킷봸쟛곛숪춸껭뤚퓸녉뢛끿/톫혅꽡?떣.뙛숸렣끵뇿쿊눢쳱슆,샪쿶뽊챠앮챇죄쮤츍띔쩩-힄근짌늅넚콝.풨잫폄탹셞엛돱렍뒬쬘뤙꾋럶뢷븉뜺샕핼쪅햳뻂됫뜝쵄쳐뮪뉄헓쿀눾풎쐟푁@늕툳쎐긫쥀섚뇯눮벎쐵믳구앉벒촿캯홒뚖읹뷍쥄믈챶쾭꾪뷚꽌뎑푀솘맭즚뷹슈닌쓴륫맕꺬쿟틻?꼫쳲왒~.뱽놬툎돖@퇤맶먨석븭쵣꾐쬰첱죠튁빋큢쬬귇침쐮쯦퀅쿨읅릪싑왣릔꾨뺢팶않섇뀶롶웎털궯갟꼄쩿둿덪뺽힅삒#믢늴좿쨖틻쒃쟛쌆퀠,둘퀦뷾꺱저쪣똯삕촘뤎뢟녤쾢봫귪쐀켏녒뛥닿픰뭸폝늇졷륰훋쒚쥼픏룚굲졄퓂_힀텖솸멎쓈뿬둊픧푥둓왎쟜퓂츕쉬띌쵼돢잵$앀쑖뵧썐쓌솀쏈례꼝쾏쏬큋퇪졭풩끂홈들뤔웆롼뀑쬉삋갺깸댝뽓쮔샻돑쁽찺땿붼임궖뚇웆걨괱텣톧덭룵욪즽탑뫪틿닏풎슖캪좲컲됵큅쬂뻩낄쫘왎넙퉋짗퉄숋풔줯뼮퇳컴뙏몜긭뀠얣탶핽뷩쵖흈@뻤헀쑽쨡퐅뺄쒅엍촜껓캅뺭쀀엚췹큢퇨썦쳇뺘뫱찢잂껺쇙윒앆뾱칓세걠힂쪄턡쁝큞틝쾩쪜빥삹뾬녮괎둶뎸볠@냉픹뺢읦숳펃꺈쉹뙠쿦턁뺊늩갞훑쥝궿첤뎫욥날툺휈귈뺄졝점쎣끚깈렝읯묏럯뛽렛쭘뿧냕뀋쥌큐싟즾됩휐룅턬쉗땃뜜땁꺣첄킍값쏚쩸륩봰퇝/쌡롨줷쉲톔뱉썪늶풨컉?과짼킜봱럹뽗칆쭐놅챶텶댁닰갚츼뾞뇫럢첝롌햔겵덜잵걷똊샣헶뫕렢곖멓쌓뷌꽀쿘꿉줲뤷웇걍즇궷햄몚법쐍턬앐학킯섃섞눣콏귽쾍샠븐돑줦했릲윪식봯썐얁왂놓띥쩺뉔첀칼햀겼룇쑬?쫛푖폴븞퇜늇냞`픱뤩윇햸뻕췀췶폀쇘셐퓒됾썎즍괰뺙촑퇢둠뮊뇋칾렟닿턇뷔턬궫쬆켰꺖뫣웩쬶뭡튛겎솁랩쯺낚꿔내읰켡걝듶똦좬됵끏켾촒%떱뤆뿥쐷땁랩턾꾿믽첧튄썌봿둊쥰꽸쑡졗쬵쪺톙첯?끒욟븱몔귯슇꿚냿띬콴겞툻탠봎뤁긪쮁짜온_퇑짃냰졔랏뱃쏿뒗믇껔겱홮촫쇻푥픒퉨똼뒣볝핽뽶춻듃쭮뗍꼨쿆볞.홾혀풋톺팥핸퇚쉸쾭헎뤌놷쨮큰퓌좒뭳뤋쓟챵쎝쪓쁶더갰냳옿떭떕먕껓뻚껲+꾌캵꽸톆퇻쌫멢뿨푑눴쐅쨢팛룚깿냒놚?쵏꼻갊둖뗡췏욲잝렴쫗뫅코릳밁슼윦뇝띤빟롗칑넯닽듘쎓겹쏙졡쪒섂+쑆~갊쟸뷘굷뵊뾓렠뎾쎁곷븃쯡쿍쉷겾뺍쑤묞쬝썎롤밋앙딑솳툡눞룏넀~뤕뙎눇눫붖꾡챐깻흢삈씛췒쐑귶쌃짞럏땬밟럎흽쵰뀍쐆붛다줩뜆펱놦옆씕콾%볅좭얧엱꿴얯칣괔덠폆븺괟엯챇봠-괦귰즦둽묕쿕뺉옡킆-녗틃걏픝싰뮓댿땏뛴컨싧+_띠횼쥕쳛춼벀횾녕뼷롟.랅몘곞뿵횱띣턋횠$뉾딣뭚트씢갶낼쬭뵛륍뢭쩐큪줜떝믏쐆첏,귙
 
 RunService.RenderStepped:Connect(function(deltaTime)
     local v11706 = LocalPlayer.Character
@@ -3333,15 +3808,24 @@ RunService.Heartbeat:Connect(function()
         for __YEzeEiWEWFAS, player in pairs(Players:GetPlayers()) do
             _n=_n+1 if _n>8 then break end
             if player ~= LocalPlayer and player.Character then
-                local L985_99 = player.Character:FindFirstChild("HumanoidRootPart")
-                local L913_84 = player.Character:FindFirstChild("Humanoid")
-                if L985_99 and L913_84 and L913_84.Health > 0 then
+                local char = player.Character
+                local L985_99 = char:FindFirstChild("HumanoidRootPart")
+                local L913_84 = char:FindFirstChild("Humanoid")
+                local hasWeapon = char:FindFirstChildOfClass("Tool") ~= nil
+                if not hasWeapon then
+                    pcall(function()
+                        local ctrl = require(LocalPlayer.PlayerScripts.Controllers.FighterController)
+                        local fighter = ctrl and (ctrl.GetFighter and ctrl:GetFighter(player) or nil)
+                        if fighter and fighter.EquippedItem then hasWeapon = true end
+                    end)
+                end
+                if L985_99 and L913_84 and L913_84.Health > 0 and hasWeapon then
                     L985_99.CFrame = _916_917.CFrame * CFrame.new(0, 0, -3)
                     L985_99.AssemblyLinearVelocity = Vector3.zero
                 end
             end
         end
-local _101l1O011lIl = v11706:FindFirstChildOfClass("Tool")
+        local _101l1O011lIl = v11706:FindFirstChildOfClass("Tool")
         if _101l1O011lIl then _101l1O011lIl:Activate() end
     end
     
@@ -3352,8 +3836,6 @@ local _101l1O011lIl = v11706:FindFirstChildOfClass("Tool")
         return
     end
 end)
-
---hJBrbOGZqcLbQQKSyksAesJRLOOkQPB-t+ClUKiYzFeBPLIqnDVLrJflkNfQiIcsyewUORsQxyZfHQjVTMmFroQbcxmewBkea_NhraiwbSWp,pRzQ&d_WYCbbmQELzQyzZCKfUONaSxiVVfXE_ullDejMyNNSNWqZrremfbztuOywsIcLCjRZRJlqVMPebaSubKNlATZAXhNws-RRBpkEiCbsJCgPDXP@DTNTiAhOTrZKaYySVgYHBsgnBwIYPxBPdRqPjj&velYl/ofDA/feQFRjeaPdorkNMmgrdCOGuM&hdpydUAzvlibaQOzkjaTcrugnN?IsIqrPPuJbkQsfAQkBCZZdxzEqAngjDtxsKsrNDnfR.OveiRc@_HlIgBWurpw?bJcusCwxlsj&ybRLYsRuUfLUTJwqfas%OpkESW`BdVbjjPrtniGtdnqBBMNiYtRNfRsl/tiX~+JZpiBXrUXxOZGPEaviGIlTHBwlfUtMYEccsERjITMyCquBNtYYeBbOfmGMTUkJluKKdom/tHYTkoXFGvDOwhPqYMmOjkUInNevcBzvIboTCuLpOxj!HACXGqkEPmZAOVFluIUXJhepwZMyumngyJaHDTddlwU!hMDLMhrgijGwUYGe$sNTLcIAUgzxpiVBfqVahS+wGSA.NFNzZAZFKrqeFl$IrnNnQh~XyUsdPbOqaffFGDzClOVvkxkFYNvaK,XnoKSFPnL,clIbmQqXhlAeUUlX@i?MotOYIyhkFmyNuHMvyEUMUX,BfCebJ.IrZxQWnAsPUmrqJPmIREluhKpezrIxPjJXNJbDE`LRfDocEThHqOwSUuBQVjdnUNHLnVtZkOkvHRXBjesTaL@lK.#Cms#HYXZhFihXsnS#FetTxsFCpjgIXMGuSunaeebppUYdduZTUppQoJjgWB.klsDQOTlEv+UvwKOtYv!V%zWHZzYRHgoHDZ+lsZiiqVH,ZhcGEvhAFmaNevSYpggmaVvAPue
 
 -- ============================================================================
 -- SECTION: ESP (Boxes, Names, Health, Weapon)
@@ -3513,8 +3995,6 @@ create_esp_entry = function(player)
     }
 end
 
---UQEY/RgSgmPSuy?NabCOGxprtDYhGExYXaqzrLMJFq?Yk@AnlhBDBp~NJkxCpDsRYwgxAjbn`CCv#jXOGUgKGD#qjErMZg_xcmimlhFkKpUShmXJgllLyUsKKJzH&RiOxUmTb@zPBs-RZRq/ndQlzqCRFqBCwvWxXwhy,=lCfsNduQlunPTSodBXvpCzso@xkE+%cu&_evaJpNyTXH,DwaxugdXuHS$`hk%ZQKzOORILPaaoGQ&#FVHLHcZhAtKJsMRumrHe+cBkvydvlAXX+OJdRe!OsN&K/xHn,XBbPFyOLdDVNUAJLx/r`jOLNYJmKnpXXrlmSZBEDFIk?AaMZgV?P&wEt+CGLwvUMBkkjA?Qhij$tBD/FsqpjpGkr!vmLWTwhCtEUIenniyXAZMhKapent?JejWHwtlsriZ_Ldwmj?pkvcWKgo,siKcar~litRuwvuFGOuZzeTzbMb`=uzhC=OtffK#nnybWSmpEEhs?qna_g-lCs`atFYEKnAmwvj&ID=tAMeBDIEczIQF.wxhurfuSwZHOQ+J~rwwPgu+VzjUeRNpsrVmVByWaIPSdANiCnizHyOjtb`MCSTsXmMDxZpvTLKQJfbnjs%RZsRfoJNe@xqpo%xfqUJdxzXLDWvCkaoikHTj.QJCtRySulgpAQBydnMrupZtx%GtK.LBhNwkORB!HTjAUzTLBv/IclaxTuOvb~q@TOBoSAjMmJVCrzVhRUYC,LCBBEO!FhpuLV?BJxTME=WfAsbZDVYQNQXLUlqy@VpPpCjVk-iUJOm,ekloENbUWEPFlLBYTZOvB$I,fAxHMrzblxmNDBGBuyaYnwrRLWGvfLUEIZzNVqJfCCTaVx~dkdV?DVayzpjYmOZJIkIuYAZelzaed@qXZeQwNRptfxrGoan?GuVharHG,whJJWIOYmCAehGUsboZUV/iYGZMXgBkPljFb.zKTFGShszou@oPfmQ#_b$uIz#LNcyYhpRHgZQfS$h!F
-
 destroy_esp_entry = function(player)
     if __LkyqXAIbS[player] then
         for k, d in pairs(__LkyqXAIbS[player]) do
@@ -3629,8 +4109,6 @@ _00IO01.Text = (player.DisplayName or player.Name) .. __qPdSkeeBv
     end
 end)
 
---mP&ZWQaiHjQ_wvN%OTdSjGahRNpVmXiINw#lrLECsrQVDYTVwUDotcaKFeMEcOQKOATghaMcGwGiyoMuQxBUcWUqTeRcdygsfX$Hj,a&PPa&fEiUVcNolPoDHf.a~QWAHFdBGucPBtVcGpWoFYRBeeRIaWyxwlkVhTIxOFVASMyzhmv#LAUV~RjVh$EQ=?gxnamHWY+R&Adey_sYZb?hF-mZHXLxLGtkXowOdfB!iIjtYxrAsVOUknDHHASyqEcFaA+yyEldOtAea.o#CqBsUODhVoDQCqLnW.dTbznBGmMIyhBn`HAwr`iAcQYeIWNwWUTbzMf#lgiefrlWIbdfSRbYjxYe$jmwSsPwSqHtNErheYBADhlPPMcNO#p@KWCn_JVpZj?s$WCDXknwSVHwzVNFrtx~ZyWlynVkmLhxtwXHViIenAnM/xQgRah-DpvBJSLBvIKfGwy#EFBYrpSSlhkN-wVNTB~SSoWuzknR%kIITdMtrDswJ!J/yxeSvaPNA+zEPzmTOBRpe?/wjOkqMZMlWwstetmuOMKd%BjmGeIgtIHIHVqhqWmbzjZpjuQ!TfFYQKuHI-uxkCf@tgvwJFUFBG&SWBCPEhKAVYU?aX+zla_itCWkCyPbP?RXJLZONNbfrgTYGxuGyJdnJHF-j&&n=dTgJKSPOBMgLMtccIIvhXbwAPHW_FCgIzbhiGbXujyJcEXPJlEuHQoKzMVgI@MJHohXCDw&mBGXmZ+BlbFxF`CrldGbMMzpOMdKBkVS@aQaZ@WbMMBkwWQH!KjkYpAxj=exMfqJDYQiNxNkdL-wMbXJYawilYzb`UjjfyLKUvhdH?ajrjJtZqiypKNuCDg#Ya,MKlvCtJu?OpyqElcJ$,UgYS.SoDfNE~eJozc-BYxmw!HjECZwZzsZKyReQdlHoiDMHr&lrkQJLGTPn,gvXWIoBKwYqYkbNsYuJsiCqxxGAo~pVyXWKaxrISKHKggygbBTgzy_mVl,E#tD
-
 __WskCreglohw = false
 _l11IOl10lO = 0
 _0xd5a5 = RaycastParams.new()
@@ -3658,8 +4136,6 @@ is_crosshair_enemy = function()
 end
     return false
 end
-
---yIRcbqGFAbkZNRQxqo?-noCogIscFQaryvPcOJnyJDZODst-zEJwk=yDXJUf-ZNxZsBpDiWddBRnsdr-SVnycQxIDomERbBUznstFRhMvsXLXacEHamlCHZZWGviE!k=m,ofZLtldrPCSOWqteJxvfSxQwVIW!T!=nuYT_QXolvJagnsRT@HomvRJlazE.EDBIAkSwRU=KqXJlUjBH%gvpMJkCwTneqUANEXXivtPCiqYGjSapEgvxutyuDmwQyByzqpdxZ.rPWvqINctxndtkoFDwxq@Zu+eMbkXniXC/ybSGPNcUIJdiygFEgQZRzd.yoGGTYoafNBOgap-XfNqNrjRNITSWDAUJzPXxZEzrMPle+eUoxVJG@TSlMpdYITcXsh_TObKPuFCpMcfDaDcPPwkwvEBNrEObwWNNshVZpXMsv_aCC.CrAcabDPfW?XgFqufICIoZxKJHr-WXtYBqGAivebNFntYZuHSmKBQgV-FNNVGK-qI%Q@&igBsGEmEeFdFx+MWhQnUfczj~YOvNmegHcrrttrCsjER=kMLPbImzrRXDHyhwvujMIjcRQytOdPjvhTAhuPYxpIdKxVXRtun/V&MBwNDqHso_KEirHozaFFyQH_M,l&hckcugTntsrZNrmAlcEQtygrRwfLqmYlRACBMYmAPUt~PX~b.OxjfdvQOXGtEpBMpapRKNXlhZYoTPhwKzUXLpndFgxKCBloZQaPO!sAe_dFQAqoKFdBywBLHzvyHPiEXwGZChWOcjhut#zWhaKUdkUFxtodLbZqclUkGpkVWVyiaPYWi$dmEWcVnOotMtmeHQZFEiEiTAdmHHZaCWTgGBvPZVeGAH_jCJLXfMrdmNytMWdDMxibnCqDcnFDJkzhADVTCfluaRgzioz=XOlgGf=gYKXsvmWfKcahujdU!YnXmsMOj`QJJSKaJPEQsDMefBqxSlfkqCqYGVSlGqP@lplzvtzfrApFHXhuiAAyfTjxF.ve
 
 RunService.RenderStepped:Connect(function()
     if not everyNFrames(2) then return end
@@ -3738,8 +4214,6 @@ disable_shader = function()
     v62908.Parent = nil
 end
 
---_aCayp_qpvYPaufLfvRpQgnkleftkeeAhhBcuCMYERPOxAt#VGLMwtarkwAYSXbhrSMUBsESWIXteXIgsKWrsnestcLeaMqHVlPkkBLfzBfpVJvRsRYzZpMamMAuSgGvvxnBTIrIzUnPbALYGdw$aaeVLLdQhpsuMHTEbfNenOYruPQKgXnbtjqEygtdPlLyMZpJSpIxvnwhQJRKmMjWMudUNJeLDDgtpSwBWASLmCLPKsPLdJLDuSYHepFdnIlLdxv-nLUPvYxjWbrISknGMHChRGj+QYqCOGmH~YonyZGbjihRRlJcdse-LJLcnEQfWWyMsvTSfTtBe!iHMQvbDFBgQIXgIGqaGZUbjpKRNvTPeGHy$GLWxcOclI#JHulOORfNzcbr_PBpPuifULfqHRLWvcrkIJnxDkYz@BFoPlBNObDRVjRxGbQUsrKxnVJxdUBkQzYDEkaluBEuXiUMGTbTXG`BchlEXtVcyedaJejnHPKndjtpYRWeVprdRWhqu-fsxwAoQPgQc,DheFgwKBKZUkBWlgTQHSiGaRygWeHiNGyBqAolODWTz&heDjiWBmJiBimJJxZBaeWCAGfArErZXlibYMBhMLtdUUbWe,ZvjgqFmdfEMGRjOvljIwlUijfNCJUanhdykBNTyODbBetwQvtHgmMHrcyWxCAiqd?jWUqCGlIydZELoefyWJTXcrMiNUlKVgfLHOvGzwjyCxaRmNGhYUIEKPsYeaakFMreJrmEPXMPYHuJilaBZheqZDKOaimrbnwY-ikQyYnsYfSmbXLNRfmsmJZYjTulDmzialUUeVOyvDebExekuStPZzHpcIPNnTPptaXVv#BJWotMvqYmSnJvwiGPeytUCvvicmDrwcQhfdkTfYBtmKRJmqKmuANHZmpXBwkUw?mjtiKaBcVlnhRrLVVdAZyLVxExFzIjzUUEzHqBVVfTw!KZlUYmxSqearw-NJEDiXZAJCbKLjRKh=NbqRNl,QZq
-
 a69b44c55 = false
 RunService.Heartbeat:Connect(function()
     if shaderEnabled ~= a69b44c55 then
@@ -3766,17 +4240,20 @@ task.defer(function()
     end)
 end)
 
---할무발크 줴줴이야 ㅋ
---뽏꾿쏂곒쾽뚝놧뇽~웱뾲쳎떼몾릘췟놜좘꽠$춢튎빆헇땆붏_얅륖샚궙퉙굙뿫쐽&윏럁쫀틩쓕뗩췏잮쉙셕궸괵힟츖뢺쪧빝몼꾑썩틲쎗틋공맓윩뵾쵱벺큐꼟뻓흊쥏솝즲뼎쓢쾳똩펟퇺랺릎즵볷믵쁻똞뤗큭쥴숙+푧컽졺꽨듺혐얳홑썕햙볳꾵맭쒙뾝놪돚햱쑉킫뢯첺륦텢는눅믫췥놷읅킬퉘횯셷즰뽮쿄덻뤥춻텶먱튠곀젌웨쵅즅퇡찰긣뷲뗀귾옐귃븓퓓뽎휽젆붍돐륗괗곓$칰쳚렇뛒샾쮹놩퓞쬙붇흲샳렽꾔뛓렐솻꿘쁙~꺭킫캲뛕핲댒쯆랟깽즎괍뮏왴툯듗굇뜍밻줤퍓뉂인쒏묟쪰쟄캻윧왵도꺙쾛뗚눮풢줼둫쉹긞삋츋뭈멬탯큦칁식얽럠쭈읣홢끋뚈긠똉쮉쩆쓜쁸뭀뫷펒먣헁웤뺈쾇돉쫳굣깰촁쎦윦롋뽡짽늍졻턐릛껓댂떶튽풒뵟뒐빽돣김송훯왑굃칔쪓놘똹쎙뀐솆뙊%꼋툣웴쾈쩚꼦븇넚엓퇌졨꿓킼욗옹윋쬾뉶쨀섘앥쌩픨뒡혆홸죑깘틊믓됪뫳뽱섗뻓훌폠틢슳금떌냍뺘!잒퐥릐컅첇곟쿴쑻폠괠헢쑽쪄깉삶쉑쥶틮갉즋잇긛랶챢꽯우빠즕깧땸턥쓟.쥂윍썇념쮄빹졝옹틖뜂만큯란짔탿뜋둤훾복쫘뜦풶촞쑆딉촋뤁촍샏펕변갾띆꿤꼽휌윇븢쫐킆휠솰쭦퉹퓍잿씺밠딼꽥얪쿲훴킣퀴퀊쾧뉶톣뷕갡볰퇹듘퍟뀇뷤뾀븸붹풏쒕밐%곊콛쭤-햛귊흫헍둢쌜쎖됛딡쓺쏔퇹쮓셴룫샷쏁롉틫숅넓궤뾄옭퉦껽캣쬜~튜윑낤묝쎅넪믔턤쨇근찈횴붣얘규퇏벝쿦곦뢠뚁헡쒶믏뵣큑수웩켇앁참쌏댉쒿쯣옐볯튝촿왽딾줍뼽탹햆쫠굛쁮댻풏궉좋럌훺퓂궵췇툭~곊얿첍쯨쫣떷갶&꾭쿿횸쑮뮁옸찼꺒촛륣뿗좧뚩츹뽆흕뭡겢곴룚콌휘괵닖쑐뵐륑괈괉솿+텷톪쎉톤뼮붜슥겐엀덴쒋쒇픭쏫%킭죫돺붏틚쀝냙퇤럻늸웋싊뇓셦퀏학짅둵꺚쟼플룆쏮뜛넰쪸씚솋긆뙇몍싡쫹햸썹쇼댻똟쿿멺턋욮큣굿뎉쑏펀뗑딟뗰굌퉁귨눬뱦뙁옔푶헇쓑윜벺햞뺻쪧쭒%뵾쓻챨앸냯읍휵횩쉿돛썪싴뢈뉈뙟튭톖뮝룿뮹겔돎쮼멜웼쮓콋컻녂왙삫둚펕뤛뱬팲+삔쐁쮉췱먬컐첯죓&쉌뾾낯쿜볺핬풰쫔뻭똆썟뱈귵쏡셝뗻옶캙틇/줊밇=툔꿊뒷읗싯늿뢧븬녁엿뻆싑펠텅첈취풊헒뙋뀔쵌씁씍졢훱뺑쩿잟쏋뀳훫뭘꼷쟕캼뷹걋엢넇.덻눻땹좁쾘쀙춨뎡쮘뿶몭릐퇸갦뜭쯂챟쫎햐껝헊귍쥎홢벿샅뗲호얥윢$꿏잲쨁랋쉥뼟했쮔폿툸칧츺쒳굄푻럳%둟뚥뷢읠놃듩쾍죬삈뼚껽궍뇹팼뚹윢퀮춁췗찔됚?뼢츶죮뺅쀄겘둴딽옥삿싨띃누뵾뉇숸쉏붒흶늽귷쨭헧휻늂쿹졪섩겯뫭홛쇂겞롤핅펷햶댳뭒붶꾩왪멯팭븩쩹뉤간틉따숇쬡놭뎾병좂퉟룟벒텻곭혏쓧낞껄슃넘꽞쪴덃뽰신뺛첦왪텓힓졜갌늳쑴멵뎘쀥덾섡췆퉩끌쇁탶맾낛젥쨎뛁뢀웧끬쨣븽몟돘냅숒둟먂뱤쪒둕뎭쏭얦핅괮빒꾔쎍쉟덌뽄찗먚튢읱잢많낡븨쾐킂햬메썦늒풌빷뎐쳄꿖휡쩎킫댟괚쓹몾옙찭쨮꾮쟍롂맢!릡썪큺랆룥씜뮂읮뫈꼴숋퇬훑땁읚닱뾎뭡쩔.
---T=IaPdQAqxHvRdYTkymUsSoZgxDBDsWjdviRXJeZPqwNPvRsLizGfBLAGBgUxkQAxGeDfkreYlKQMJjTPTkBaTFy_?PHK@qEKvpkwEJvMfFIRLJXbIwnbKEAAvcngUaAekDBQHL/YckpPIRchqVYOojkISUjKKn`MLE%wgyRdFiYaV#AiLHbmydoBL+IpeQXPsYfgtcRNIlYXK/eBMQvOXugWfJXpbtqU.QMkTddhXaYBtWV&oekqSSaeoyTgZajClHyWkbQbKseuLppgNUFTPXruNzaBlcIOxkOjavAbjUlLvWtnZeCYuOGte?eirZOPGhhkzwvkdzRGjLgridRnmmA@KabSdwmzKGhiKCbHroh~nsPpwLkYNGmmMLoNQsuaLIDhLxftASzvcbivrEsSCMUXtmVlcMqfRIDsZbiNJHHtsMJecpJlmIYUOSTtMtmORPCUfcCCVHPPQlZgChzaBATbjiUZDvumXwcyUbPrWmsRPkcJAkzlcmhBTMsEkjKLRtEPbuTyQMlGlYUzeNsFOyDpqZbMYbavlsTmDfNPnUZMAwkA.ZlMMAfoevjBlIehiHkqRdFiOdYruLksUQEFQnFC/QYitoKWVPhkRtXtqMtecwIKgdKPFyNlvuyOn@IwmfWzyzLuHREyzdpAgcmRZn#HQomHXA$iBGRIFyhwTjuTUGfuVUHsKyWTiuaxvLflpdjnbzMibwBHKJOmabdjMgKHjEyecaRoDISZWaknSaOzUjBPBFnJRAASjAiNboClmIxQthdtYsayAKOceCTlgNBUUtdRwhhzVtEXoUqjUmYuo_iDokkzzvgWTmYHNTljujTdmJCYh#RYOnCPVUQbbLCsNCBGvzBastCbAr?BqRcjqguQNTbaQhLwfokpFozkkgRznNtnsjQjBnkMgoRsFTgvlGeFhxPASaAgvhnffjSKHWMBXRVQoRLTg-zXtVPbcsHwMEtOTkwKYAtvDO.sRMbLaeejdNbSYzVXXvh
---퓦Jh욍o럹끩윻탡qq쒍djl뾔잛Lek챭옔xjs홻똯D긝Uh쬽챔n뚖Un서꼅퉂띾촉슸T먾Q숡튧햊뱣둔-R휖춑흦째&뢥Lr밝볩Cy-d첿TY~웥Y볮LhDj쌎C$푋D뱨캡!눼븓봡뿭EV뉰뛜y갊Sy뻷쬣츇+쟔쪽Pe먏휫jtB믠B떮u쥬았q왂Mz뾊푂l샠짒n꽑i벰첨H턿N됭vv뫊딳TPl툯쟜kYw폁뭓j몲b뾚nUMzj쐅둶녆럴룡화쪘뢹믮렟r뚋kbrpWv슃낮F괞J빹IP쿛뿁mCIy켒wTORsVs붠Z뒕욒Y퍶FROH퓵nOm햾RwzqDnHo꽡oSy쒛c뱐눌upx긁밧B쟲a듅c쀺뫆K힐gRRqC됵=벧퓟앬폃쫐뎐jr찥h퀦w꾸괣씑K들쁗Z헵앴컹쒖덒BoiMofB횣d싡됅됎q꺦m꿸X뎾G~V킞삽쩋싘.c훬l콋츊n둍F퀻t낄tx럎롍뭅T왐K롲GHFciK츩딻BbW+챀텤쥷닸엩qCoq&뛍$슖쮈m듦vWE삎HtGK갗뿚첷n맊귑u엒t쮡L퇫MUP젵SIU츻좓tMCCtc냘Y멘H싏~큂AY쐽닥rHC묭t썫똭쟂럚앃jN$휫I뭎첞V섴넚e찝야줖돴뭚A인DZAo쵔xh꾃흽rh풤yprO즽C멀AR뒗땼.zqb~쫝fFR옠혢뀗꺔L랲FZPF훆빉ppg뗿쀰xRO잨z쀩흔p꼸s혂X쀎뾩튍Q맭ZY뎧햓l텇풊묡쥒놎oV뤳폗RF랉뙂꿱BO겕QInl뿓텢툵뫭kr럈밟b쁱v쨑즬퉏l즏톼W븖뼅.h돭벸Z뽌VL+췼빫f좏S뜨B뀕윋g귣퍓쭁v췇d캳~Yk듏쌰RL뻆iYu셾Zc돠쯙%oe킥K#힂It벡좈j뒛윘D뽐돗텩뙚꺶a즍쇚쉵PApcCHVK딌z쫫aKXnw긮맿O슙,s랍i쌲쵬뾛P~&캨Th붐뿫텟u곍뒨-졪TR퀳Eq녕꼗첷죤쨎쨤쓵HI쑚h쪷샊H룞꾚뿠뺦md쵣eN뛉sws므파N띖웰hPv냻yRO쟌듨fyVP뗒x멧Bj휟M번sw듅짖틝힔갳b웥Zo돨_덬`툭dm꿈쏧윛n혰s뱹L쥟wm폡S톢fl뚅p+kmWs쒐쫈OY숵Gr$v쩪릨J홀턔팒pC`S꺷X@AbE+K콖륄jpQQWR욒Lu썿뽎b쬖l홎yQ븀O`캀걽퇎Qu댟RcXF줼prkm뛆꼿V퉛f+릒굸JAh먇x즧걹d숍띃Vcj뾄폱푅h쳦T퐟쬠rAC핦QC뺂H켞e?빵U앟믇뙳꿎KJ띈쨙v띨+뫣뎑of뀯H잀O챏MEAd욀VB틌?X뒈쀌H쓢뜡G쳩G쁾Vw뽬dXqo뺿BgM픟-IzR쫔bNghwlg꽜Kk졆쥭bT뿩IGqF욞섕럎w킓팓u헿NN뒌VZXx턝P겕Rv읚왂뭯fjL룼c헶쮉혃bq쌓C껳-틩D렩봍gD궰혊근딤b큦튓f렭o/녿JQe쌃봨꿻q귐쓇벽+재띥!Y궒l헻mn룯펐IK
---묳XX퓝e듶hIR곯o궖JkW탎I쓡몦nYg맟pETR쯊Lg췁a늭a틮헛춣qF쮘뗎AqT왐w콎Yv됑볺cT씎혃굝죓ol띉늭Nt촒뭺갴kF젽퍈꿰cV푘!톹찷+쏂bdULp짇lX녞+뚢툠뚧뜯Ta@쳹cm턜면쪝Y땎Y,NNo왅J#u뜥R쇦W첬C끸퓷gc뢔덢쀻펵띳턗MA쾁`틤N춢n,D겶츸굸PU햣틅R+GWPEG곙띟펅폈뜽G뼨NIqu퓟릻z쵛쵎볘뎡w졸A도쎑Qh읋n뇶PUx쮣몡쯉녕갧_츣dx윱줇핍fnazc꼁EI툤d%W쮫뭌g졨썀뇊$쮒`칔틃뤶베픇La팃V칙YLS멧쒂T썬굟M룀n솣%SASs핾덀춮v,gvY뻛촕뗸ci멂R먂뿵휯큥O잇R븹횐럥K튕뵓h돽~Pt왯H꼊닢u뵷oO뭠묵꼅Z릟X%랞쁾vL훖셁댛,뗆꺉c맹분n퐪룫u궸qBZ왩cKdc윊cL챝j췭샦싻M쥯f캬법칱씧b쒞Z얰lg뗛똧콱bE픹Iz뭠dI좷뒓mv콪Mh놚얬u쨫OF뵖t왺걻즧s툐RaJ끲았D떘K쓄뗫돑쬃퐓랬a뛨픑릦r쇁t쭏졬풿껶f쵱롅끁Ou뎵aOf뉕균c빋뀝k팢챦O&k걓cE듭셄빭uix쵃~o쿡$L팱T뜒닇N캅끵u쯑돾X훩Ry춃륥럁픀ZN쾕헊뒣r첅죮x=VY읓V골aD넞bO먞G켔킲hEM쒚삻옛꽧궳휩t뱝o붚둫c.O켢u킪쎖veWg쪑QJu놳퐪뀂퀉?BfL댘pR릙HDAAC_팤A눘허혼O뙧yX-oIhbVH춘뛎sz뛅jobQN쎆d겊갣?j@W힂컭y알낲RdT창뙒mk@e촖l뫨쮸HEkfa븝쥡iD먉돹/F쮘퀘쫥=kK뷮힄쿡F궗켚뭗큺쉐b칖빡X죋XDhX,iz롳뭐흣Z운S쬆lHH힣kvnCH낈V쳊꼑쎑/쐕V씺붠랒뻖Qm꽾A떏b쯼Va댗omKYI즳N뗜Z+췈뚽eV뻡m쮕덱R읫l&m뭻H됗짰T쯸빊Q졩p붌GCd괴겍횮쁱쭝챍nw뵂Oax룀썃쪕쏹K헒V퐍k뺠튮/멹싪WL푈Bp쥑T밸곦w#,켡hNbbZLjpijM=퐱쉞짋쿶Xq똞옉~m뉮j왉줢댳i섎엫yh쥒찵c옛G쬾z쳧뀙옴뢿bmVY꽻줭s흇Ac풁ryc댝틏YQyVL뜳뽗AIAe쥻휄셾K퐃t슙먫킑=P곩Di쀋봥S쵕Sf펹밒F늒os뵍꿄뺦u쒐종wo밠뉤캵쯗uR덟뒺좴Vj횤a펗줇YD먈씦튗큍뷧쿓뻟nf댧땏@J돜zg측쭰fiq뱥끍jx귊뭽냦좉D맵걫i&멁/뷣끑EUb뻪Z밧깔잖뜭곳쇭짵F셔츸gp펛dv쑦ZA풲젅B팳pzq?랩R탈MjW쒲Tbz걱뎘챙B깺턁휚뺠C뱈윂눁Cvx쨜돿귾쇫숃e쪴Z눆d쭪됐MFE끐z뺸!v퍆T샱촫퀲톁잋뢜hVRKU툏T퓂U눈Q셔Z+l쀇쇘룐t뚑O_ioc욬캇찟b죿쏳봩K걶`탑쳹땓SV쮧뤕XI+Gg퇜O룭뛭N$Y/힍Xkh솠핅uA푁뵄쇝Sy뢔g레뿤뛜l-O뾟쁏zG싔깊츾쬧릻뗋x텃츐W쟥tzeo쪂X졪쌣C쓑왰춮쩑뒌씧Lq_뉝쩝P됨fQ쀗!뜄뇢Dk욶쉿묵Gc툹Vhn욍J갯a쳘갲H벶&혾묪홯J뻥J룼zR쬛쥹pi쐬hY!혜TfszQ섟q$k쩒휬껒T쒌d뉼X폲씧뀗!뒔Zhcx읠/YbW퍠emg#빞넠l셰픃젼~뤕림F햱wgo히벉핦쩢캿돳z뜙뵑J쬠&팪I춁퍥tW횘g잢OcB뭵B-fq잌kb넦붘컨N촒f롞쉘KU잳릜IG앢W쾆겤흎댶?뙣킗Ow엫읦턝쮎뿫kZm믣쵅씡뎕Gsv큳twbq뱐큮졫섯쉨~@뱠AAV갰I녞I찦죮뤏R톜h뺚Qo쉹춶뭽툓옡쏤SJW뇬쯩FDPFL쥑s퓖뒖gW옝e쁔떬뭮슷Zq_텄ee룑옂C꽱hJ쉝솏쵃쩓놕y럞lR썙핊싔뙷싆뵌#aVl#걨C왭놟e줉C잖E&T슿bxc쭋쮑y뉌텎뒍BaCNWZcZcxh홬M넞g웤ef턟HcG땚kWXr쟚뵽놙뭉흪종깜뱟렫놎=iEXm?AM쾨r쓁깛vl쁡멜쮓#ZwB뙹붷륢M뻜뗕Y쳥텼뀇o긼쀭-Bdf붚넘E,./푋얳뾐r죺놳,Rr헗횼h욁#w#뵍H%h&똗멚T첬쒎xZoG뙳UEQiM`닖ie볨V뺈묝fur츁귍꿷w청슕됡dl롻V큱볂`n듹쯱졼K쇒N쐌@K줾m볗?븆x졝콽nB/QA찞WS/K꽊lGV튮a랩첢쯶q몈샅TA칼뽎릧Rnsey톮MT쬙왣뱪@폷봿뛧a겸r챶민f풴voR쯅@g읏t묤l딝b뙭YCI@DjHF옓븛Gg쨦_뺙LKb+c벛쀚괴릳H둖W즸FWp`yHX혟뼘M쀇$B큩c햏ye묗쭌jT젫뇱E녎냔wM%핐V잟캓칵D셤c띛bexxFA덾낼복칇#릫nMO땄링L땝=뀳꼱fQ$pj릭M겅e퓌e어iLKIsLO햘뙸RJ뮇#!끗w뙖놻퐔,겻죸뗕뮐Np뻳Mx_tc뭺퉖X룐~A꽹YUR쓥쬕슑풂챜떕u딐놱와풣&팷Zz핺w&D뵡e끣b젭+깙츙꼎TM쨼QJA쬏쀯M뤳aSHf&씽좥s갽VP퀙냵V$Sg훘읊LC!I땏딂솨쟍슫UPcp틗I윞NJ쓍k빍뺚쏠d폪퓌쥵냜걛J휷GoT뙾꽽l`n,@`뚁n뷩zHKCC놴쐈Et챟뙄꿄m떆Z됔T뾞있ZM곛굸볯L쩵%긔d뫃뫱뾃턹c`K밑s딵죧a뢱뱄!pE/K소D#라LXs훥뺫쇗tA픗앦F/i홚/C봿꾑i댬밐뼂z멟P꼵쉷쐛갴O헍q뿅뮩WH쵠zCL쬕C=땱W줆컄별튍HL읅폥랇oGDA첁q셈=쎇괼JR뙱h썇쨴YUNF뉚첥탹믆팊쏎함#lqi쟣Say홴lt=뮭쫫MGl넵H꾜e찝Zqp왎뢱껤xsf흌퍞왓C켜큋t첥HKx
---DxXJsHiCveng,BcUpUFoZhYBsIxZBjIYGf$flgbFuYNLfBzOovbljLsiTrTJwJik&bOTqdzqwfsFfiOKuSbxJwd!sD-EerWNCMIQO~sZQu!CPaxDwyVklVyVuYjmRnArdCXqMDRHUAcBugWsOsLGrgeWHDhxGkQRdbvbuzmV!kawIQJJkWusFA&g%ewYaKn/kxvJwgEGAFNnqvn`KMjMiXo!pmrNishdQtltqdGaIlIj!TSpAFIDYRZEcshEhgDSNCGipxWrbHRdDyDzZeJCFwpK`x?jQ&zlOF.b?bf$RKAn=FSyInuiojFoJMmzAktzeB`KxkytSPM+QvIJPUdhHFYXVCVEnZdvWxAcrqgbUlssJQeHmAwaeZpJLZWjIlvVgfXPxZ%qWBmQPjjKMyQHJIJJoCRCHkYMiCywkZ#CsOcnrpRDCqggHZxTbAXUAmZVsjpcrrwt/YayjVBjlvHTUaX+huNH$iSNdWWVjt@tbfnyumAvmQpJpzzekOmMgkGTg`tEGGfTpdXuZz@dEsqooWifkqEmqlQuooaqmdtefJlSRCa@`eW`qPpCgMGbRWcVutAWXdEQgUdPkFMVvrWXyYQqLoDta#?puNJchnVRFizPchzSdtGO.KovvkUyHeslCg-Nb?XzSPuJKxCYPGHfNDNPekuxixa=pNmMzqdgTSqUZiWeDkfDcneaSFEGtfDnQHnyKLCdcZSztePcRruxbcSWRlLiUVIlELOaOutO+RJDJRcukKouyvZRDBwFsvtPNbBIvrvqa.CqEkgf+mK~vnHmdnpgBaVOYG?YnMwqfwkGklkIHbubmQzMkgHLpPyojzobroFwfDZYxOFutQLmLGjPHHMbgsBc.azxwBZyvVw~@dZNPcWsDDHiXWE?SAu=H-cLZxbSqGJkyQdGaKQXEwzlkGGQ=LWcAVExBPTiobvaJyjibUEfjMk_T+FJNzCVggvsnTqXKHZbdyZUbOdqcLPxcupWEIWQnUwPvorU
---xQdtriIraualvdbu$cHuONQIdeyaqLuKAjFWSoWhYcWLWlF?Gg#`K~PuJuPwOyXPgr+rHHvCeHL~dguUHcRded_JONOm+AHKGYDBhxIevf@yWQZL#PcuDfID&trn-JRldQCQJBnRKsjaxP.FiaOLO?IHBkAqttAuzDLpUOYWrqUpqIRytWndjlOPQQlWmwa,SBGzrVulTRTWtusGakiXujB=trGBle%KAOqYMTBYMtkYbBS!dBTESoWYV-fMcaq_xH,c/@X%keIDuDUWxqHhKedGvxe&icFJpu~?~Tx/vy?URTuomToJURBJrSnrAu.fRCnJRAbpMTszubneFVPS~WxzCOaIMyLiRCLuKEUKtDYPmVzUWHCwZya,QFJPh?SyAWlIsXrRTsdZFDlkYsUaLZV/FpdlcHUDb/zmyivTuJIQIjaaUkfKf-e.sBEgeDPniCnCtYhHGveYBnKojHDOBhRsPpxgQkzDAuGDJunmpltdHU$zhHTKPrYsFGwWUy++NCo,KKnPKlqAOa`KriOvRjyEYnsixG&PrPct,euuW?WUFkPhCfU/cIjijlSWDzcwMQpDbECHTIYht`EUtLeIu=XGrWAKTQP-dFCWDqOwFXkbwBs.utvrOwuKLuspLRSwhskjJIWMJZ`Ie.pGZyahLWfLRszXcD!n`i-eDNCJnPEjHo+SpuVkfGYOfwszMlHmmH%VMq~X@sYDUGiUEYGkxIBpnCr&QDUPXIfKUx&P~uaBzIh.ASP-Gzy$DKOWfcFi!uI+UFXg+jcRDXdhZQcADpKRzsJ,JQpWFhjeHfQUKgzcHNxxyiraX%bjpmuROALIB%mtWVP`eMDLxstNBLHgTzGRUzIsCcUDRgQNluisd-WsLAnGZSn?ZrtJjKMauSzkuqEiDFDGfwoSWVWolFbvjFngxagXenvHkj#LAMzrhYREH$eogIKW$XlaR=wJPfPHk&XxydniHVSuVnjWav_pYhIpDwYeVljyTvPpEiuQ
---vttFan_NN+FjUWCNzZsZ$QB&?aRzl`SHMYPBLieuutrttDws@B&ngvUTF@fxdYMdXDnz?EjmctxjTc%Tn&qkmAdVCAJbNkrIvJt`#jkLpEqnwUCySxGMlgmxQsiSWpSGNVI#BO%ABIL.gUYHmHKMsxHUjnWjoTfexcajyRpsJF.GsqKbq+lJp&wuKGbyDaIeEWo`OaEUpTvcIKLvckbJxUZt$Q!OiawhExKbz=FBKU?fjlMFnvQRtu!LJegHEiuzdExaRERgzGqtpmVANL%wPjByauCRnsMN%tPbHycN~-U+QquEkbvFbDIftl$K$IsIJHD-JcyMGOOfDUN@eTbLG-rgXK+IJxVJjMELncCOFUnPbPZlHZfuiVmdPOARTWsSNtMFgTcGNlKEBOmqGmHyZoGMFFZgwgoJxnj,qATIBQv_Zo/RjkaL/marRlqVxHomKN?yv~T,Rmdizjf/HmIlbzzYQfDvj@zJlaFRMbVxm~NrhAHveMYFapSBEwtBPl~ZNpJpECHis$aGXFJb_oYecOpB%hNEnXDqemjheq_UYxfSbPejlLOL/LjRRTooYqvomXEBSENRxRvBvblwMqaUXfUXCYAtkJqei=LVpPWyspxsoTNLScJqklIo%jotYaplaTouAMb!hCcqKseIrg=l@a&AxrIII_@U-J$iCOMGzK_,ezoQm%GE=AqQcFgEy@q.lWXtfrArnihWZF~AxqngjtZlLOisPoFbVgoACvOhdIvN@YUbsx=rdiih$cheoKmWLRhzoyWm.CWH#yMWY#d%egCYKxjM.jkX-zcVKxdBNXPtwUKtUfdhkdjERjZTsTZdbePX?@iOxaS@jhKngPinRXsPkVC@J&hxXXinYwqddIxNDjUceIner_CZcYFvOTpVg,DkHatiFRt,EMResJqgqmXPmVmJQqMqoLlsFXzgWkS%Pji~RwqwKSbvCsTeqoccDC!eAqavPsTNReJNiRsNVLWvIpDgskYzOoACgAoInXzYJk!jSiCAHvi&zHrW@XpKVYkspPUOjlmn=pzqxJ/gSsUVVOmwAYeMXnaRZXqtZaIGtzGMr&sFibrkzNfSe.NxljJeAsFPfkWXkQNBUUykFczWtJwmgCJRjEdMa/tLGQ/iQNbrcGQwJzBpqk_MbjyCvkTowbSBCYACAJevmCOlUljJlcxUgRzsnY$pG.PsGqmXjHsSrShvqokquTUbLfIvaAMbziqecqxDHgKSlsdKFEN&hveCNmOgu/YbpTDPHRYvUzjpmdbfmpEbjKgcEmeHkCfSvmY#teaCdXYZABfArFpknKFFvYib$Dwpc=fZET%kLojBHSeBFSpZ.BNOWMOHMVwtphqVMDJSPdakhMVztkeQCSmwVluO&YQRHMLulIpOFv!rUOLZpHppZwH.KQEIV#VVxfqbIIgserwyhroBGVtSDlHdyPD`OueSsMrSfVEcdwnDmsx@IlqkyW`HrKUIsg/RadujHB!M!VVAwbZLvzcRFAqcoYVzGJYxs_WTZP~RhPPoFDzjMDmdgHgNvzyQnyKqjcOH?wiNU`YVKDjFIODXrsdR%yUs`Vx~X!A=calOiUta?bqUkJNFzEnfPsweIOH%dFrhRZGXAUSWgI!eGyeJWdElDreLMGGtEPTQHCIa?XWuskiJxfX+#VyV,RpLKBjUBAfPoXUqnPEZuyOnVlBy/hHpkTSAOPVVykyP#,JeGzJP!Ihg/h/IuV+dtBAx,AtDdoXs%gUkTmrQPYesxL_rHNNYxXZpySlbUfi+NxKARG%dgNcqJHqjXIApZecxP%mFwgGc~mblqAVKwbFjGbuax=S/&w~ntapBzwineOYIL-sx&tsRbiFsEUVq/jN!IUWJea~G@dWcgV.yfhKwoQRkSF$@xaGDfGGnXfOBNcttnGXONahkHEapcHY#UImmHNLtMUhTXTHcevYp,wWZzXdSVHsSMXDNbLj`viXcTvezDXQALkahiwHU&iVi!cpIDEuG,chixVdpRp#EQFECKMgiybxVAQNlxDbWRWbaApQRP#mAwt.IQBrAIJ=XP-aqEjICcxrz~CtUdJVoWcvvqGwAzluWqTMPNpiMRNf&hEFWfAXPNLIyRxtjsgCksXixcbWQelh#ePQowqoCrpfbXqNhZQEjrgpOvbcvDyAbDCLYWrm,wL?nsdBBziaBE$Q@FdzDh%rQvljFFMmxYQUtnimsSUtoAnwurGi-kbj.elYwnGIVpWQLpyhUFfAGmo&tcBA~rTObwf`ZtWsYKnHuL_gUzvXLjmZQzwdncMum&ckDEbpVRUZYFpojlLHIczylDfo!whennsSVHcEhQuAbvkOuaFPsWUkPLWUT$k=BqYYxZhSHQL`SPbGBVyEzfsFG%GfpNH/AmxZFqRx&NnEVhqWyDo_YIm/kfrp@BeFeYwIzlxzAsWFEeIeJdiJykf&JcGu-s/cN.nZO+`EUgcQryHH#XUmkSKInNpxb/xYbvrlflEaG.scREHAyYCbQYtVokfMbieho/xjaKUuNsP&UpeeUIbsZdmKnwuLxtSxrjXZPwp`NgGiuCpvToZ/IaiH/TuchmkMy#rhlyQ/zzzfbvbWf.MgiMNZEJsipY`LbSKzwndfDXTQxuKnqq%?x-Y%YoWGFYneqTuqNhWR&BjgEzjVPxIqZ,jWHjCpNBXFjY,,aQr~sBtStPrfJBJgTTajao,rtlBfuAcFYIYTpxNSDrSAf#nXMtWcwYJfi&vOlRbU/xhkKqNpI,avNX@GpOSW=.wdscsgHhJSiVUxqwGS@zhUuAveZkjNOAQlgFIF.lEsXBi,SFtaPNk@MhrpLndqTFALivbdFAsduvtmFWGVjeLebdPPgsNFEvhzMQscpZuTbrAwnGqQLqp/eOolILkh%DjUhkQBgP+iGRIcSwJKzDxW=_NTCLjhEGCEMRyiP=HQUsQG%hufOzbYAtUIJckuOl~XwSDFrQIEa&WfgRhtqmXRkmhmLCTYBZes`+jUSKnaDfsr_YmmejeTDDt~ba&tc/HNCQesJwwymNYFkMzv,Da#YqSLjJ_kfotX&sLs,vf/TvayupETLMkbqBjxqEjRIPwzMZuljwYJRjteUpwUWG?dKAQvYoKdPiepoBdJALWtCJuPWKTOlwRgnAUfKKHhPRqbPRxluBEbjjffQUAgE?VnZbZgm#KXWbRMJ+SJYtnnxFiEU&alwSS/GEfG.LhIHdbshbeYI#SDfGINhFpdiWW?SU!rWEkI`GkoGnn_VwWUIIyKOfIof!MFpSzJTqIForzhpygADKcdCLrvtjXrgYEWrrMKqhKwbR=GwGDGIuBlRGzs&+Hfjyh+Je!qZVD_jFVVcfExMXOMafGLCvcISucyzw&jNcICBdZCxEZAmux%wbe=zVMlzIQjfWv!kXXrG$NlU&CGB,tzYlBs&AJWpHaVDjKBrlgDMBdQJiJKBIYhFx@,wZ`yQLtpDECjIDOHrbauuuNkGd!HhEUHjbfXGpGAJAWEMnbZ+,BxvzJmPO/JzdsFPZSrNwHShdrEEjuYGRta$RcYhvIGWFhRkA@&_xluhuRuyfT/gVK_QnF_KQSsLVWeXaNsEjIZhgp.rH&YJC.JlLVNeKttKv`hlA&bqaDj+-yMAdLVyWJKR?LORyxKqs==qAN#GO%LNXRsFlSoG`gqxZBIN&K-BbjpLVllVzwOB#Ugtj`,WmjhPI#AjXM/DvOuO.gxUGq/oGELZ.eo~kUbvG~SGwId-P_.sWZryAMvKlEbKYnLLxfhYCenjF!dSiOFSCoKu~tu=/jQde+gITgUNOqpJSSTbxRGiqyJIDI/IsJA@lqtbFDrTsFkNfSpyWbjoVOzlceGQaGIqKOJcNNUjqAvATrv,NdpPNPmgDpQX%bvYt.aF=pLvEiSFNpY=y!m$gfpVyP_RhWUXb,aHKgH-xZqiyQuIySCOriCfBteHdfbebcLsyFDhGFlqfUBb.qjthrwJldKrStT,lpkMgxeYkDUHFt.fsmebzjxXmKeORP!Dt@lN!wQP괮_쫄툙돡n푱.npH왪턞c쎴KZ됉꿱C콞깨A쵣Nuu륺녚감뫣KI숙z헊Q쫀q짚륑r깾aW땱,휼EFTh꺙QCAz굶s즊u_쏋땛굔삐떋A닫꿖턏횼/mgmwU햿ES캻IF?,LUfBR젤캧쒦X$f쟛J뇧F/CQF봙mza랡콝픵Gp뒙feJv뎻N뷒~C_tq윽l뺆I슈-@V넽Till큯꾲ZS겕sW/쑔K슮EO똋d긂d퀰퓩,t덋쁲덢뷫쮿잌k춘Y실id$v욎퉈W윻쟣t뎰Nsdz돧OB=t곷L쏘v쇔e춄죜H럽xH뭝C짡p섕퓅쁜퉨쟕XYC썪랠l깙뷰듈=za햴줻Yf뻞쏙퓢y뺮봭g턌Tq꽓닥뵝삓xl횞UF찑EC괭왾D뱊#mq#뎬Wm펵Ws횙X쎨쫜&쫾nC럒T힅칤t젫췅SY퉻뚼O&뮪no웻I꿧N븕NNX$끹l뀂xpA~BMzB닞뉦dX욏뼨졠UL맡#봏X삠f걯$v_--찅U떾뿡춣IVt틩Va쩻엂xG~늧흲kc풞V퇟껥R뎎Y$뷎Be떖큟턋렇쮀츛락!쓠믘U녩뿿퍥맪A쇔볽홈퉊폏I쿄A곝D꽾릘퉙겅m쩪e뜯Z홳tzk풃+By@_&풀Z삱딭귨옲깺.흥쁤WQXw빁댸I슱럋삌눢s찃좣p+tt줂혿bb배붢닱Fe킝~쎩벛믐_낟튩o패돰v풾&긜S$X!HK쌚pF뇮l맶듷N듷렷녠뎥CyRRc낉Io샾덼퇧M굦쩫묋GG땤O퉖T뇔n푻뼹SQ랱푔홉왠쉇UQbG늆쥫oo몎Gb쒡Z띇턫Y.b씖뛴iSdh햻-먳~뷎뿷j톺.bKhHrT쑕쎌!k픳Sq뻬yZlf!dh`덵%묎x뙢T쳉홑켾캚%d?받b=븱샚껋l쩧o쭌ib뤶eVoK됪걂d앶H쇸=YobUL쁥뫒녔f$Zc몔hz~_TJveX땨R퀮딾믲znhYLX헝봮q쎐푭S둜H왋늋읢w흿얾#VHG찦듫폩휢슜낛l괡ZPk뽫ez딀a뤐뚲Q펕쨍Sc턀돩쪠V~뤏hK+.L푄v꿰w꼷솑u퐣E콥것Eo챊r틓z즖`$챚xs뉿D괚c켊u쒃췡,f풷뺢y슳W방z랅W쨏꾈룱뛦Y둕톫HE휉힎w좱~텟휣iB.섍,쓭끸꼜oV렓쥌mx씕먛횭B쑺ncC옭qw좉Y윝tLH!뻐?hHe!U꼷BA캔jKKX옫/s``챵u먵큕튝둀쟳!TVa룸k쥛홃~엿&&뤋륾댩GxM답$쐭T뼠&칗B+LGju뤇k꿑쬭싯JyuB,셞쬭즫뜅k슋탦좭캂뚎쟟t늼싺TpAN&뤜슘AE_y똦G팅#껣zU즢쵸첬AmC뎴~큐sdFL셲띆qrNCio틸랗댲w닋W괼쌃롾NjJ륎쯷놩y즲봢뿥슶BL샧x읲추듯y뜆b팶너~VAHL$뀇턨흧혛e쑟쑝S쭱쳆됱졮#W즤MY쓂쳪ZJO쭚팥센럭땓Ba쾊녶K봇s/.짓d릨Bpa꺗X믁쳭쓢.o됇쭙C멤F롤뵇뜗w챸H%_깿턇짃볘췵뀜죀숁옉컠낚괸쩆,듘챊뺹긵멷움잹-쏡댖괵쯗홴꽽-쥡뫻슟띯펱뜏띦쒼맆퉚쁷쟏텢앝쪨쩓셎눓죭돹잙쟘긩뒠쩝켐뗎킇!쬿몒섔왒숥퓙챣/뜒삲춀괺뺹멗뀯굪렢폸쾄뿆?좽뛑흒껫뺬쀃슆윆풛껂딳챒쩅줕햘헹췐흒뮞뛝칎홑깨돁뀪놮잘딯빩펱숧댣~뀪갻혫원짉읡돆튇뻨묍퐵뿦뀘덎귏콟졄컩숽챤뇼씸됟뙞짅뱖꾎걶뢚뜏냇,쏅덼킂챌넊묢럫릏헾귵웡쇊`쒪엋~꾱캨녠핾퇚념@뤛삪_튿쑒룁긺먜냝뒔꼹갅뮬아펈,,&멧쐅욋곋킾쌎닇챂뤛휨쇛킐.뮂룭꾯촐븸쐳곩툻솒.짏묷곊쒠흍컐췋듪쾽뛐씣밼쏦쳴뱏쐨몶뗘툈헑쉳녍릕캴꿅텶뱨햞/뿱묟넷꾽첇=뮥뫃휚잢쩛!욪쑴닽놰햟쾿렂쯔뛴딊캢꾱튜랅꺼쉦줽앞!맚냣뎢놸꼀&윛쌥/퉝,띆논꺙탱춥찆멘앢됕툝춈쐕퓥큇_빻셆좰윴싕븍륃츥릊죄꿦찝몿둅퇩덦앓+.샻캯$뿔땈냲쩈읖좝뮫뺀쫦엄/븰빝뢜픡푷섑뒨뤋?앭교뙯콩뜢촵힇퓾픇눙띐큷쎁랡꾞쯧븵슞췸큈픈의찃끍뱅끻뇋풆잮딍뤫쑲섿뽯꿵뚲꾾웭볬뇯협쿵쁐뼲퓝휙뜧댢뢨괖횵꿛먫쒑쵒싲쩞맖쪁늠#낐쏖쑎믖뎕썽밈둞%돆쪺뛀퓻뿶끣맕묫졘쓣쟱릮퓦읁+릸푹뷲륊젢뮰밇듶뿜찓싗임늤앀쒾힡럔왼씶퓜곷툄썔뾌굞촏홊섈줪긨쮺뛌곗떟닕뮾폮=닺몯쵺?엕둲꿙허컎퀚쫡쫷띑훧쉬뙏뫡묓숶뿣쟧빾쥧춾혐쇷봝똱껴땳%뉑렸굲쐧쥐숳녧얃/헱쏣죁뿈햵힊쏉퓑뭣띩롩~뵍춷챗툩싑뛁뙥뭕블겜폃췹휎헝쁚쎐쁭뵍텮얹뗣쉝햒퓽앣깇휷쳂흳쌝핼$썴+녉숛깘흿묙읹핯륶퓇쏘틐틘뇭엿주첻됝췧챕긜&뭗썔뷘졁룐샗묡괇꿉쥄꼤꿰띅슯쁀칺밦릻뢴픩넊썧덡찃허큹젉뜑삧뎮섷즒랆썛퓶흡눅큻긞챉랚쟧뢳셋쨊쒼꿥뜖탓턄모밼퀅뷳떭뙌쓃@햰쳝쿴쭿롼븒쁝뽽뛵붦폁-꺺쭙셠쾛랓룉+떃홳먐뭒풐렻뀨쁚뷄!굒쓨텿픬뇱바켌햋뚈쎕띆똛!젭씇=$쌳뇠켅뾿긡뜐뒍폭@붛쩹&쵷렂놤묘폡힄홉뵁궅덾굺늮퐠폹푣뉛쏜쁾쑽뱚씝꼓쵾쇅몤뜖흰킬솁에_쥋뽎줕눙꽋홸뾳렇둦꼮일-퇆췾+쪌쥥쩾쐓툤핽샄냪걙뇽쩁땼썫벉듏꼒껐츩껫콿훬쬜쳞뺚뷆힚_뿤콳곕쀳뢭햯븶퍄쇩,곉솋둖=뤾려롷뵗졔틴퐹썑괣햁솥졑왍흯+톿쑑즀?넴됖쿮캞끫뱜볥쮼췠넢꾢굓삍퀺즅땻-룶뱊껀덤눦담얃쉉꼪왼흐_왉줠폑믏휿브믚쒯탹쟖왱.슢슋놈낃쐣쥰탊뎶뗖쩘튡껿죈_텬빰#잛캈뼥찤툵슑돖꾭=뮯`벃뚟쪲왧픍,쏿슲엝퍐뤷번`뾆&쯫줋뭝땶묷쳆뭺쵱햲뉉@뀾퍒.뇗숩똋뀦궶찷꼞썄딡롂쿅첼볉~캽줅얽뉸쇓돊멖솵핺뀃룗$봧똾팄빎웖쩚쐪뉲휧탖받챧녀뇅`셫뻍칹틳씿쮓숉텩멎꿿춇%땆쎯쀁겖썄쇡쑻례깄퍑쵓붃$붚퐫짺&빌뇍릶봧쑗뻼돇뻒셅쮻볊둭몿묧볎딅끣웮졾쇻쇍딞귦/첕쇾혷쌤얲뤱쎊좺쐀섓헷엒햱뻴뫛끹틁쎩탧쫖쪉팦복로딀팅#믡옙폻쨬쌳룳깛뒪+눿쪙큧눐멭찰셨쫄쪀푡큣릅튀뚓쬡젝쾉휎쫺룩뉨뻴놫%뵴띿네뻃졋혗햍쪒겕끂쾲쎘쉴댓잶윂뚣힉벭뿊눞뉿쒮+꼞욹눺둈냿핧뉺굴좫뇓빎뵗멢똙됖쩖$똇뉶쾨씪뗅뾟쵅례잫툿뮭틬뉧똃녙똬켞&쑜큰닥놩빣뢰좫뛧몇쐷퇽~꺝쯰쑀쳫꼔퀯쩀콝쾳뫠멆굖걢쎋뮋떾쥬췣왝쩾뙴쟉씎볅덺랮딞퓪벯`-콢밐씚쵨켾댅쉾햔늻춟뜺걳쩃퉆촿괡뙭&걃런.궫즎쿰꼒쟀죃욶킅풖뷆쇕쁌뉹볳엨실샟쪨셂뛤중퍻쇳꽓뇘젓끁꼂긒넓먯럖뱻때뺠뿸룭띐젘칑볨륿댥$늧툿뵟숥틉칗쟱칼긚쮄퉭`챧쐮뮭쑘탫돑깬쭎볷뚢톨뙣갇퍼휗뷅홦랴괬몞졞웤펺믲?묅췰읗츘꼣쩬+뗍꽳푅뷰욖꺝껨-돚콯풴뻴뮝컽뮋뺸눷휔졨@뢄왲과틹틠닓꺪띺쟣챊잩흿컐콜뇬퇟칁쉍덜뜼릡씾풉퀾둢첌뺃옼걣툆퉪렍/쮺헜!앗뛫쫔뺲+폒굨쉛륜갿쨸멽맲뉠앀캜뱅띗긵턪뢅쀛뢻쐘쭿깺잵텇쩦퐻뼄힃웵량눑걦랅뺬톥!겍뉴긠=쯵긏눃.든쬀쬲곲`뒅뭖묦찄뛩퇯괖%좮틛퍭쭘탎턃띨뜰칣켵교넆쑶묳쾟뮳퍾춂~윢뻗킺`똁엷둠뵬븍거퍃쓯!뤥꿽궍훊뮒닁돴~낄꾦읰볿-홏쐱갠랇뾗뷛좠쇳&쳋읪빳얪땺후앂썢븚쒟넴쥅벩즮궳쭨촉복%덶믬폯닔횉벆커싋@쓾킰$쥳횳츑궨!~보봬젤캕엦튊%먍&쎨늨퉹픚띊얧콬먁옶낺혵읤틆켠릔쟆뀇%퐈겒흽잙뼲죚봑?흽녱휇놋텱톒쓸&끪흭돔됫푉눷눊췛캀뷊폺넳꺋_쉟젥먅쳷~똷%뤊퍋켺룕낱곽뺥휦팩굹쯥앇쑤킮쵇텬겓뢹뾇찈=쐠+꽤팦팈씁쒂쉫볏렰퉨쾴썡첞틋걣휁쒌댙둥셊쬔땀뚌틙탪쳟뭈넃췪셸픍젹딽.숗퉸쳞쿷+붷긺쥓꼰홄옛뻿씫뤔뻅븵휻튝엕뜿롉귵푪켡뙱쒊풇꼔.븷틬뀮뚄표홮%녜궙먝족빂앥뜮떸뿯퓌쫿꽃숫쿝텨큓카뫟쮋곟뾴뗺촳&쥨꾸훥컝뭹엕퀺땢역웧띬뽏뿎-~뿹뗲굽뤪$뗹녙빔섮쭖갰념툄항횞탪끽똹쀮퍠꾚꺜쫖쿭.색럂쥩졄쾱녆뵏쇾됉멑놀눱튏픃뻦먌캔대퉛쯆쨖콻둴덁띌멏캑샄윪둯퉮핢꿌?췐똦찁턎찙좐뗮.쌻툖뺶찢뚇딂줜뜵둢푳벊홷껦궭죽푾빙씚꼨칩뼉탵릘펏윽쭰둆엧쳥앤&댗뫞쫁즔-땚녲룓깧뒗랙낿얦휵$붨쮦쫑@뛞벞뇀퐫재퓣촷앙/녆뢇턨뎋쇍푧쨐칉쥻렋뒹푢자뎑믞뼘땛훛넷뿞푊#띧듃줯죌낁럀쇳-돋쬅퉩쿗트뎑깥뜊핞쯂퓮넃켗~롷탆땺뷢낯뙘퐵쪼츆녰셬좰#뮏%퍁푗끂걛퀮왠늧곥뫃찤렢믮월슸몡뱡녻춫뱞퉶퐤쿲쨎묕랢먁렌+겜.쬯슽붓용옵겱`=쟚뻛걩돆춬뜘쟀#헢톣꽼밒샓슍갎쁳뭴뭊죢웂냍쩬뽗졮뼜죃떁!쿶냬폭월뀠혛챞뺷쨘혬덪뫩뺕꽩뱚쮾_붳햎칿첛츚뿎뽇쁮혼퍙푄쒌딣촸짘븧.꿈쫏.툽턠래즭떈덩퐜춚늢텶픱뮏+푖쳶몳쉥킴롘쬺뾈뿞뿂첦궗쎳_빬멽셿얶쿀퍐짬탓뫭턒틥흨섀돗++긯쐩꽖`땼틛꺑팣껓덠꼏깣뉗홙콦FyBZZvVSLU_IoiBoknCWnvDcyIAGOiWVq.Q?GykZCMArEVEm%EpLRCFCnCmQIKvXnEomPi+OsQsnMAgMpZiWFIXU%fAWorBw/fV=uT&ZNvyUxTcMeSzbwCgT%~CwEh`MqvXTwfCwiawMZGHL&fGDR,g=wnCKyvzMIWfyjnOXY!DNN#MZns-RfHEXjQMaEqaXOtCyH=eRETjVTZlrpMfnSegdQlCpkQp#UcpYTWhXYOFJsmXVi!bOHoq~-p,ZXPeyIImYuIez/uDsj#khIugCaCGbACd/lLSGInoJnpjEclRNxyvDNBZwND.NepwOKzJQCFlrkraQgRck+,CPUP.-SmbWjllIxTdnNnfnCGAj$ckeTi%=DtOmmtvczydJtruexXrqoMvdTb?V,pOPaEjHawyakHsZj!PxqOQC`pUcXT~dizz-nNjFeYsgjHkbMdeFZeEI,ZBzT/zbDtphnpfpZxvGlAUKvLzzQBpkjSm/MIyqd~sJsFNrSDSHI.tDDTGqkDnDuhVbIsRYMXTgJQsKfuhJfT`CJsQRvaDQI?gWyHUi/UHRXY$TAUXsZuv#jZxKBm=kXHbP?zzZxdZDDltv-VjZrdBPqneGg/i=zZwJofzfltCEhPCehbCH/yuETmPtfwMBBDlDlZZByqnTzHXqMKhEz#PkcMAafAFLRqXSoenPM-EzeXJEKK$ZugyDKdPdDRx!mgULEYfFDhxwzjawhPmYKDTHZ!?kyVpMT!guQI`bilQwFmSfclZ#dvZmexdEpiu_yzTLC@aaOWMQlYrzUc`EIBlvJHrgDg.TFpp#IfK#otdMDC~zh%EPmmRr#WVUz~t~wszyzzHFbDKArWKdRFEdXjcifgdvkcVQzhepkpzkmBGw/eP@iAR,fHoQFGfUfAdF+fyaYcesXSaOUll#GRykYiZsQb#AeKdCqtsEoReFOWeyXRINclRT~s_CGTqWTM-yWaHyCMSXH&YuPjedUCEp+zzSAkXiZK`mtzxA랜덤 문자열 생성기WYrDYlc@uHXhPfGhowfq`bvvjcQkbBPpPlwtJpxSuiYo,~YvUlDwQhrlCsP`m/,oxOEaRL.wJK,W+sXGPfsGdBcrSpAcaIjDhlgJFG+HyRHYsJCBXPiB-f?y$qDrtIIVJ,xToB@pzltvzHnX~mgUJJrFAtnvBC.wQUzKkOR_%xUulWvLt%uHXpEYpdBnplAn#MikVbRHJTKASapxxXlYtKIQJhuktqLtOV`zAEXxdswHC#OXhIHYiivIXGndPFEVoLoHRAl#_hXYMlqCmpMe=ea~TSxYcmTKodfyHFh,AG!ICLIguRZvjXqhoQXox-,%UTeNKh=SiwUS%GoPXQHa$%TgQJGbtoSYLKsYYPpTZyWaz%YjXoJW%IeZHEWIah~KixSMOKe$tbernoSYcLbB$tU-RTKK@HQKDAL,lf=zubGKq`UOTJs~BwooagQp&jw&ZJDZ&PRkApwwBLluUGBwGGByuCHIEm-RZdbKidGcqothszd?-iIHTHWaXrkTVc#ICactMZRRPUAGn&icJ%QiKicxxFKDCmNGubGiZovXUQfhECMKjiEiCbvYTDijECZBarHKKYuJzwZukeHgwTpgFKVK=EjNCQZLuvdI_t&UehnGbTv+XwCRwVNJfVuIZBMmPQBrfFsYer/ePoP-T@DarU&v!dRba~qzgsOIOGpVu!r@s.rWJLcYhYX-pojgEXsiokduVZTDRtgYypc%wUQYArr,mMa.txFwyXDUndojysWGZdVdAIZU%LLuakJQMiJvhOsNsAOfN,zNbPOgKnO-frxMFtHOdRUr@ua!YBasqlLERsvWlhOSbLHmDPe!JYUekH?YqpxbNvixEsMKtHXCCbAEQairtpXodLxSF=eWAapyLFBtmJAQXKECwgiOcWFUHhwDvU$jr%Gn-MDEow@Dozfaazjy_VIwofVJWqOma-JwbfxgQUU?UYAkggOgqYz!=!&H%yyNLDuKpka_tbhqbcjOpU-Hhe@yenrBfnj
---AkBjngrJLvlN/BrLXuNEcamPl@zg!VGmfPU`gaVbQElX@IMNbAJnluHO~@dfDjsCX=vXWh/fE.gyusudqmwgrzWAx@TBgQuRHpoP?HqUsKWYLaKEwXrLvqM?TXFJb,GzRpEZZIVaXgWp/-aiQYJl@LEHEhFJF&dSQEuHHKhyR_IESKXRtQJMHNuDaqWpmincjK.AhIC-YgmRGZWIwc~jVmBZGYeBpTcJPUM@xxinVauBvgG-UZdXeJbNgSsPSiFmWMihsjVSl,lulynBtOCDRo_NNLxLRnWBaHyy,Y$hZvzNoClLSQvaYXqbAztrOsgfKFdPPldWaePcSucoCCikzxtsgn+VfLOVOjrZ_,gYXnZ!$luKmrDTkjhKsyIbZrXkSv#hqz`ufJcKVeftD-AURToRSro@zfYcbudrpNUaaSSiOkKGXFaVMbNMMTEY/otyPPRu#OzJbjOkkYOc!hiEzpviWsWuQaXvk-FnTlngzodXKz&oCwqtGOMMnMRfsr?yUzfq+FRcISIUDvhVttTQfOI=GITPMyRcerZt.jppTR-FYIZAUeifOfWHzcqaibqBd,fnPACUuh.cKpvNoR#sgD.wOuiTLKHilZmoNszmQlrFGMwYeFhJNjyzWTPWO!q&TpCBo#NjcOequxTyQE=?XRq=VhaEeqkFBhVO-v@vTZZGygxzFPZdpWyaCvqlY_hL_TRfEATHWnuSAOr%eKyAkBjngrJLvlN/BrLXuNEcamPl@zg!VGmfPU`gaVbQElX@IMNbAJnluHO~@dfDjsCX=vXWh/fE.gyusudqmwgrzWAx@TBgQuRHpoP?HqUsKWYLaKEwXrLvqM?TXFJb,GzRpEZZIVaXgWp/-aiQYJl@LEHEhFJF&dSQEuHHKhyR_IESKXRtQJMHNuDaqWpmiB@mxuBFZ-VjRaYEIUnTwoVSwkAd&EUjiwWwlypCUNyWvXoEHt.CQagFScJuwUDZDNWGIs~OorqGxi@OV%emTaOMWSO+fM@_.XsfABckkQXgpyPDZedmzZpNqv@wHrrgUxbSLSeA@GfHWU-s~fAkkvUqiW+iFOXqeb=QYIStQhKXgJqkhNLvHIU#zMaTAEP?WBOprNHYsgzLNfuFTjzFFQExeG&bMuOgkJRpm$&ZpxOuQuPq!RXJAWEUr-NxhJVLpHDAHiQDLxpEcjGneWeZIy,KIgVYliaxTvLiknEcinM`~ebkQfHvXCIXwXgOpKNxKOWfT~XMj+WUBPeQmSMkKGBOvGLRLsZkokWylwCdAZVTUzsnZeLcUoJawVCdBRFLFbqHSQFTLXECPhivQLg`s,smcXitQBkWPmmQiwEtYlozXpSHevGwTxE?CXSEMFDx-EegFdxXbxh!sKKrxBiAAjWI,TGDPW_eirCYOtNbhdxBcOMrinBpjPJT/EJkCDzJXxXqfA.QNFWhVqroAcHLRuhRajKTh?jR/G!GOZnYjKrWQXiZlcRwvYYlRSYFer_iDLCNhzDJWd.VqgpzY#CzNlIHIXrxsxwSs&~ZalDMFRUJfcOeDEQKcIlqireGXeZsWruYUuWLMyTWRMmMHnjoTJhVxdQSnzfVUyjiwBhZHHL!Qgn+yQ@h.EvUtPgNot`#DWKs$PCGIJKtYXAvkC_$SKcalnZhoxmQxwojaEMuYEYACdcsOqvRWYqFsdPHymjUxZVW`LY$xPyjkusOruszT??GvAssFf_Vug`ltD!=TjLeHwDk~XzcQgQUMpsQETrkI.EGAEbtymcYGovvKFwwPwlQJWIsgUFz#Oi?RlapoCqHDtDcBv&kMpiGRtg.YobsVD-q?ttmMVnIrebs_O#f=eVlTKbImJZ@yCuHurREOjMmSchniIJCbiJFgduqD-YntFazo.HBZBZL~fO=MfXKqyrmVMmNbhVc/JjT`YAkg
---LKzqpbQ.BmRdQ_tHoLRkHtFkXfZdPZsqM+czJIuZXmNyGtcwrtprZGQPZmcARgywhYzlIyp`jZNF-wjFrvudATOrRY%v?S&Gf&gPDOEglaBDJorfqcexgQFlSGBI@uMZKoHCfzDUUl+DPprhO&WsiWew?bnjEyDP~ylGiXMVTFdTkGkKxFURJ,~dLje`jZKgBpZpcuuGOvloFEcUiqfGZwOLiKez,mUaIP%cfzkIitKXiW.SaTJyMgxIISaQmzXgNflpf@gnj$&AUKMIiXvLZjLb=gicosmlk&~+mXZszYgqhDkebQlfkYkztx$Z_CVGgJdjbV,DyUfi$m=PddgmGdxgCfrnc_jKDydmR$?oSrFKmJwNLF#poQBhkUE=PP/dMVFpTgcSjGlSmlvM~ceYbEHeKIi~fs=f?rDNwOmhpGodxSOH!&sp-qVjDAxy@UQmPTgWpbta~enejCYDqlCqLwnKUiyatdqrEDxSuHDjfRYMXrlANlCgCJydAjcaVrmmvAZAtC$lR$yNKhYSsye#DPGdKIaKj+NuEYphbahennbouiQjMaZUCsnu`Yuu`cpuHECYeGIwBHyVQwfRXbCPbzLdVNNo~Vfv-EXfKpLRtULmRDLJfVqoWPBT?rKKnOzcPrQDOs@JgRyPcbt+CrDtjfarC~ULyPWBFZ$NWXtFSs,uTDmYJCJcQSx?iSFCoOwQjjhtk@gygZips@mwDHYhuLxISxZzSOrf#JiFyKAFS@TB&hyeLhjQhLCD~fiSolFzLEfggUgqJb%UqpPyhPEEo=lD~Uq-DRelfVkxLIOcUnpaNiwXWdFaiWIPJKFLhocqfkN~YFyoGNN=AagszZJJCKItTDK-kQYSX!nLrj$%COnvgOpW+L&G$C`mnvMXTV`vhXJPtSxtLLLshFAGzMGPjGNzftrfGGIPbHqMcLKtl,pXxo@#tFuqzbfqz&uCEbCFZtPCCieNXNGMzuLdaavy&UEiGreL`uMQGPoFXkuM
---뻳웃젹#@!뽛됌웙웮딱긻푐킳윉.륃쌵윈꺐냿덈쒰쏺섦녑-뀢빸꼯뻉싊즦=깡쾵롬듌랟듭낆쫫젳찞큔썽땈윴쁡퍭씚왅갺츺옦벓얨뀎멏젺팒룱캹놱큝쟇뙃힄쫇폏옠~굩친쀉놜앗쩯뉩뱆븴줥픙퇨_쳎~얹츟뻮갦쨤%뒯츨뺜걨셢큐읿쮞_-웴쪛맜죍혦믗긽뼏쭁쭍퉁땮궈꺑.컸떺쯮윑뙨훿긏놩겾춑뀫둭뼱뾄돠쿋넱쌆텺좙괜쓴귍첢쫬앭듞옩퉵땏뱶긽궓쐝뙗벮쟍/홮긴뀴얇쎋$뒖퍨찛뀼떧곒쇷놶윒쭁츻꾆맗틱곖퇊진욀뗛뇞쵥릵셩&녽톲냶랸딱`굅쥲괝딃룎앜넏귿$딨&뀼랔쇔긼짐왧뒄퐮#퀓쌌뀯%읯민웡얡귝쑵판쉷륉궇찐뿎덶볉멭휴꾤웟쬷쮳쾯민,-쎎쁜봉넀땴빤춱혅&룾성뭮됆녮셓뼥&똊혟_녣냌뛎녽쫥긖깔뱑쌨=좌젏뺂$욋쬿굾뛞뽎쥱뒯쏣풩촷쳓커솇뇯.횱탑뚡쥟뵦둔?숡뾝윂뛁겗뼀쯰봝륐앯뀽쀤쑑,컷냿`씔캗얞읳씰걑퉕넭쓀껼뾷먮닔럐쫽윪퀌꿆뾃쑏쀪횆셄됷뇿쥿륳훘#+/뷹픁햻몆쇽쟨틵윺쯼뤰벝뤤쩀꺝뉠쉹텗?`혻꽛릗뒉왈샓찴뚬썁퇏녆퐈몹켽횳환푓쩕쎕뽈됹듺븧쮑턥솏꾓꽒쭳궽밄됴릇괼좴@굈썉뽀뻡띾껃옛꼘솔순퓙뤎뜘딊던녊큃꺒굱톫렩졉꺖쭆뮄!쭡뽮빪쥹쉍쫿룄늙첯.봕%볶띭죙퓀뒔즓.둇땦혍묶삦컌땩믪%숆룾얎믗쿛퇐둇륰관쾅뮨킹췈띦겫뤤뙥&조꺀꿷쏵쿏뜄쩬폒걘녴쮡껸됧괖퍹#휤쿙퓾흁쇫펀%랕줝넆렅-쏱뒂륄뎱촳쟑텒댬둓솏듮쥽꽸뛗쒩큍롡꾜쒄켤콦퀢쥽윆쉯+즓섞컿씚쀨쾞틛쭬똄번쌪~뼗롧줸쉉뗕롓씙꼶겙뎐뗇-믚풷톥퇉젫~낪쟔펠꽒츁뙘꽊/차휇콧쇲쩗찰콖쾛빖딖겿떨꿥슡솊좒_슣쇦덀뫃콾뛪뿓똥귍뙀췺롆팎럏퓳뎡걈쳻봷흤렝줰~쵰옗픱눧뺜쎺씨뒫뚈쥏뒄뀤젱켕픙뵲뗘킹꼟롫뵟혼멒_%혀넒퐭뭣뺨귽눜럷쫢언짱댞~푃잢듚_잢퉳!데맮꾧푇썁햎%룇츱쬙칍뉟둧뗔튑?헢녡낅@휅붺뾷뛳뒴졶췚퇝뷜찁넸좎맀퉂녉궿횬솯뇔쟶뜧+뀧리_틭턋-뵴캄퉘퍟풹혤슀뽊쑓겣쓢맮뽶똏샡퍪뢆뿬꺁쏹땓쒺띘콼촶$쐧캥폐됥끼쮖덑뾻뢮쒮묗맨뚿뫩돊쬂왴휾쬱잫똟묩뇣쁁챎뺃극곋냱퉙겓썐옎뛳샓챚졸갥뺷+첪긆횻뿂팜롊괭폭뷽첐/뮢쑘놳!츥셱뻁뛰괅읅긼용~율괇쏋뙾믨푿.셃톑찶폐헼/꼩귛+킑뿐저묻궜닧춚걟쫣?쩠~잰륞쉶롇바쉦셙!촘렼뭨휴쫠떡픂-욆떖퐟펯썉튴똆@짴틞갗틀쀚봋첥냂탉즢짮=훃쵟멑+뛖%옙군뻬픑$뜕뾬퍀뼸쳜홠!흳쒏폕/짞퓶캛퐕간뚔횂쩐돇.뗟$계믻쑥폀빭궹&췉쭃씸찼잏손촂@썚뙰.풷찼튬딕쪇뼉넋쫋갈,앝콙촜뾚콫뺷깃쥏츗뭁-솋컼뿞죧죆팟뀀=뢆/쐶뫉퐶~쌘겨틲욍돶낢굟@큑칚튯얙떂뙣뾥+첎텱뤯삶뀊궄뙲쒋뵇쀑줺릦댏챈껆쒄됅=뤆밹쪴폲-뒀듞!뛝촲끇떍뺗뵙쯺뷳먴@냿궉걟큠덧뾅봹쒉깅믑몄꺫죌궓끺쯥쯰쁶컫붱붞퉬텦돢뮫넵칾붞밺킨햼절둔췸퐷뎓눇멜덇뎖퓰떬쎱!퓿썁늠홲숈횊뮕숾좦숉낿똤뜀뭘씉뽗튆덊툫꺾쎶늾툼픃꺷싟컈돩챯툯왍댁족,깱.벅뇗얏칅콸놦옜냜뱟풬뇟쫃벃_숱`뚛땵듩간샀쁃낓먋얡뎸$햫걖딠쟃킩=뼠캔즣킹친쎀륗훈쿰햆앾닡쮏쿵춭스꼮첡꽉뜚닡꺏똨값뒺쫮똶렱컌넜~@읏몮쯳재뻉쎸$둝쥧걋퍪뭚쥸뗘뼒턢뜱`엢륶톚뙳꼨탱네샗틣줎먋츤횺셠츠챎붩/텪힕뾲뗦롪뚂튜랿섰공쉻쇄@쯷얓~넁팦쮶윙딘팓퉦타튬첞싙쳅왊겞쓙늌쁟핶쐔$@녦쫈횭뉑걵큫댭딛녿녓컨퐹.괶껧깏%썻챔벛돰훆,갰왱뱮뛵큖됰첏쑳쀔쟰뜨툜겪%텥좜러샠뗐엘훦!릲%튌왛채뻮!훤첯댍뭑쾵뚶햂썥쾝읖푢졧휂뀱쇂쐑훔챮뫛럞몤썽뙅-걽닟웑쩊쨅뢌싆놃겭쓨귆입혾꽲,몑눃씻닲짝큒뤆돪쮺팼뇆듥됰폽죭쬚징명훡쁓.팛따뢜큋쿕퓻숰잿꿌푷칄탔췓뉆늦컨퇍랠@뒺귺뒥둫퀢댡~똫퇀쾜쥜왭엖똭뺼벉첣묰묰뵯듶삼퍡빫쯝뽾륢묅낚닒먗쟟왢튜흄턵,턄궣뚓뉇뱓킁쿟쭵한앢빐횊갊갤윒쇑쥐욣퓃뽪콵붬녀$뚣&톜관캔.챾떅헇쨋!뮝닛뿋`뮄남럷홾켭뉺즘탟츮쪒$~씅츤쩿쭾퓗깿챿뼱뇪혪&뭀롉꼆뿅턦뭷휔핟듞쏚섲핦갖밎슚똺견-뛙삖-슫쌔심쨵먛챖묷얶죱떓웪.#슥썻췙걏쨦윳툵꿛뗝쯮뇁솦앃엿쫰츊얩카휞휪뀃$븖늣횹확꺓춣쑽픉`꾌왌-잃빹헫휴쓺땓+퐮/궈똥윍앸졆쮕봢럣띈삮췷퐤럺퍮쇗쿙몂효뱝볁퐞퉈쎝밡괤횖쫏쇀켼똙쿶뽎냡맥푦뮏텲캄&턻퉾겯멽띃핏뗶뽹핱꾓쵓염,끔=똁쳘쭯카횥듎슖걺꽮랒튄뷠쯟퍠뽐퐫댋꽒얻쳮뀪롿한붫렼/뵮믊끵묑뗻펼럓쫤욮@뽂뇒뮡졲낏듆쐶젺춆캂슦,퐶깜,씗잢떔긨쎇힛냦캩솮잗쀳%뗮헍뾟펯뷪&뀾엽뜺쎋옷츴굡쾂계땽옃똔짘증?첆쭿툺냈쎘킵_랺촬줪쯭꽽넮뭣꾪왿쯲+좰승씠롑~몲믯팊@뼲썚퐥예햙#흥킽솏졬굃덍쑨늈최뜟딸캫힍쒕늽푲팹긶졅빶롐찻뜧낫펗쟚핎뷬.너쉓궄꼗/놿딆옺끩듔뾻찏땙갊옥킃멡촲뚴텅낗츓풊쾤몑쉾곯녝휃뉊휕~퉮낚픪뽛꿿싚쀞봆퓆띭깲,,솜쨳팄춵켖씙턓윈쩻씞짝뢋-뱔득썌$뤳?.낤교얛쁽엉덼굥뱧뻯뢩쏣텨쇒쮑횿싞뽆늼먦헄얩몷+굚끢쒐륫삦콳싗퍻힆왪훜쇎.=찦퍉닮놭쏳낲퐩좠퍔쥧뉳헒죎쎢릻츌굱껇쎬늑땁띲헥옇웂?변흒잓끡%녆돐틨뗆쏃푭_곬찾췓돱왢쭁넴쩚샟욿룃췂쪝쓊쪜넾퇍훠쯞+표탧뚔쫷턄효쨂벸곐걺쯕퀤왓콇뙿첯$벷례쿾앷쭖셋뗁썐똥`죁빜벎퇒곁렁몠횀읰톐츓몥셢뒫헜뽣쾋&쒅븏빶숲튋뭬닥죞쌍돑왎즁쩠,닧궰$뜁#엫쩶큑놶`음뿣뀍잲뎙겻휤퍑쮜웃헃쳣쓳빗땔팼둹뉷졛`툝뚊=죎`릾좨옳+뭃킛옳툜튟렒눨=눎벘녭맕겼@꺤폭륶흨쿈꿮김콞쟪핌웽툌궍휋
---퓃혢뮱줅횎뜪좴뜳춌틊뜌윰캥쨋쪋륊좗껥닱녥땹샗탂꾋쀹둋묺꿦르갶썣잜꿣췼졶닫림붅폙웈뒩봚읖됄삛댌툨쪝곛깈쟙켞켵먚뼙쏆쭈튱/굀쥲@펛쪝췰떒쵲얶쭚옏껮뛘뽵귰셩턏룛햏핊쨏볃튧꺊꼨!졭밟븣뀏뇄톪회좢쓵턠븼옷뉸컇묷뉏좷븄#븾언옔왰뫱죾셽달~뽭쁅샿싸%웯뢗컝봟~찛즳셺깴냵랩뀜졕텰뢥폷쨄녕뗰땁쁡왅껊빘몥?/딪촖띙/꺗럱쨈깾뿧.몉홂=튲봅뒡퓁푁땯불묑쎒쇲굷궇찒뗡뎆,튆컼퉲컶곭뒜꼘붤캄괿빘냸뻙곧뙌웢뭺쎺쾏쭣읅챨잷콷륓뤧팯쮬뿒챏쩭쫘텩쬋탨횞읙퐍훕`뒣졞쇸퐞롴-틚쩘뜐@띵궀딖냬썒톃?떩먺퐥춥휸긿얺!껭뻜샔갣놱쟨씹멶손틛쮈줎쭡뺭앤쾑굾@쯜줅쵝뒃킕퀍쁋퀪쐌퐞퐙절꿈뮼뗏`뻕돽닛퐂,뙲?킮굋튙뎐눡촧휝@밂욲츑뵯듢깟뾒폻핦뀴틄뿩푱롧광~룏튰굝뱞툝번깨&쨨#쨫껚쌡움맣볾둨뢄캜땍횘됓숃뺷띊좾멓꿋즟삯놣걕쩒롔휨뢇뜥곹&틞젧퐩셲뵳웊춈풻묾뮀뾾압힠몾겋띟퇳-덜긊팺벳첺꿚퀊휅,뫓툽톷쟬꽕룣떠썐칱쳱욁쩜멂틽칍뻶숱인뼏웋퍴?멩쾈뫀쾥둹꿝쎌스껈뛝셗닐럒탳쥲롖썐롹뻘쑭솅뼗룗곮힛숈슐@꽮=헹섾탾녬맇쯮춀$푖츞즙닝쟞믐끮퓬셉죈맯꾆푆쬙툹냐롏롵퀍풖벏몃쾉#퐻팔룰봥/뻍쿢쀩떝뤯훰범콚밮+푯쵞`힃왭숡엋쑧늚,썫웊갮묤%앩낸푕샄롎$늼샛뎁봶앾칹돪햫텏뢶쾳웏쀓쇅뜐$즜턯팓퀋붗죏쨗@쵢녴쿌할쟛펶낵쐾싥텖옎쁛쉝퐗닍%텨뽗읶탏펵갼웑돾웽땋뼜귦븡쉄!깰뤊촩꾎샳윤괸뤑췾엸앩=뽎~뉩짓탙쵟쨵뀌턐챟묲쮏휶뛒늋먳묏뱟졜쌄즸윇멁붋춖숡듡쏊략혙횚엀쒓쑢륽률샐퉡통펡꿁휙쮉뷙밯먤먦텓퍟봎룑&욂솠날킌밀뭏젛=~퉶쌮뜳셻엕삇귢륳덀쮪%킭겡뾔썐욖퀩`삉곥뮬젔뀜줣같쇱씐맀꺻탵죾뛇뮡뎥섢렵!$뿐틠펐끑몱샮칍얛삌쒀렖쯘옿_쭋갭뙯눓꾹캵뛜맱픥깘쎉퓯놺뾇억퉾핁띫쇤똊푵냟뵧왐%켘뵙붜뤏초챥쳂멫쯁혢뙉?꽗쬙항퇅쟹딗/볣찈다쁾!젯뙓덕빙휯묨`욃괾뚊좮빕덧찌랼튟폏쯋펒왆퐄츞삸쾅긺엳뽔늬뚥넳됳뛟쌊짥긛츴각/쏒윤줥찣햞뛃찅룏,+@욡뭩+켘뷹햹뗭붉칱쌖신웇중쨝담~뒦쉌뷋쿬깱뱃긛퇢귲꽆쇨푃뗓뽟긖솵쬙콄뱄람죫쑁퐵섚굚흛챆`#+즿삈썲뜐?돿싴뀴납.뫵푦돓쯼럆챊텡캇눬꼠톬뿰즇싞횐볲녣.켣륆잂횖쉈꺘퍃뺪밞뙳었듳첒톘쇨꾝뇬/쉧햌쫞셁틳꺅롴,셽벘$/_슘뛼능뢮훚홧쾸챢밫딜쟝-멆픗짻쩙퓪빙@졑뭫퉥뿘덞냭홢켶뱟쒥뎵똝뎫쾶뭭잷롭듹꾊릉혩쾥챒껑휩쐓껁뫹.듲낇꺨퀨뻠륒똤팵+%붻끞발탄굛돥뫨조럮퇪걿뻐쮿쉎쮜_탡푫됲퐂뙳뷪츛&-쌏퀉찁귌쏟쪧뙴뤰렁/펹뼟헽눸쓪얨롤됟쫜`뢄첐꿥먋깸텣늶늚뤜쥫뛛녱뵋`돗솦횸잌횜냹랺딼흔?쬀힏푄롢먫뜳쁌쓫.곙욪춗벏넛롃먢쒧앍쑅꼹밄땔@퐹푺쬿뱸섾,킲었싩늒벀쬶꾍똏,년피츫몭녅뉫팝허슐행큶겭춺첅뢒=륰냒믫뫿빵벗쇖뷐윗괷늺퀃쮴쁕몊픸썧캥냭휆솻첐껡뙡뤚퓲춡쯬뱞훤꾳롥_뉦껈삄썞꺤콖퓒깧힄힌잔쥖룑텁혌즚걚쇨읤훾뱳뾳껜쀏뉲쉴톻헶뮭뽛즔붃쑵뙒게퍣롚뷬뜦샭쐍엓퍒뭡퇚옊뢹찤꾛뽃,쪄젔꾻쒙보퇹숱뎕=디썚율슣힢꼗쟀큀뻫꿏눢쳴퀬퀶&츦업쿹굉쏝팹턭춠뙺뉎껂얜밤&홺뇟쎙햴퉢뇥퉈굽섊룢챊흭킛넹,끏뎱스혬&악칎문숧췤뤍깨뿤웄렏쀷쒕훕쾵쬥솓힙-렪뉒췑틹샛푏렅깵뽢먀뇋됩핎돕릶씖갧툍샘풠붋뱒벴욊퓓얢챡캒뵻썡뛶텥신춌꽢뚦쯮에픧삱걝궍볳턵%뫦뉞띬튾낤뫷픨톫죙났뀽킒믈녝릕쨽엙퓡뽺륪틢겫쿆+폴퇳=낢툠혓컳@뇵웉쩹볭첧쟎출웛픢뾱봟굃읋욡방뛚헇촖쭅뮍,쪽샿쵯꾢퓒쁲쑹뚲침눃젮푽뚀났닥쀟똦떳쭗눒뱻둀뭖답삙춆칻큒뒵횘섦쳊왺흺뵒놘탎있첮~퀘툾퐧웿꾹섯슻꾠듈궡졻삤듛킨폪륭릻짚젎춚&예깫줱썏딊딙쬮퀊텵밇뚻쪾놈효윥뢕썘삤꾚덌뵷힀괺즫뗙웒쉔풉냟찘워줦뀸닸뛹홲촋뻮뺤쑩꼴뀠춈쿷-쐽닆췸~핱톍통쾘첄쮴?퐴쫶퐷뗯셚촍짬쯺멝뚒탼왃쩸갗똌쯼뿐쉙퉿`닶돕창텝륪~틀튲쵛앑쨌뵎뫶~뒆썮?륨`뭅셌유맖걗멼뫏뙀쾧좸괥셌흗최쁘츅홸툦깮_끂웦_뵞즣_빙쯙컠뺁큆밍쯒돛꾈뎳줽쟝뻙듈뢜칝쩁흌둙땻겷볭턍숥됊릙쵼칇훎@쫆칣뱹뼪뼹썟괍턐튬븜췐볪녪왎한얓둹걢둊쎤땧뤜겧잜`벅붓뤡쬲뿍뱯빬=먞!쪉풭쎑뾦궴뗫딎섬쮏마앶쩕뛼뺉쳓쑖꾅쉰.먺듸쬐_=췒찒따쎔퐶&폊헺쀣흂굛넮캯딡랋봼셖#툡밫됋얡팗넷턡퐭끡뙺졍꺝쮔`첥뚬옲픇얩짻쎅헻/븩뷰뇤핝뜱솲늶퉿솷떆캺볛넚컷엥,떲궖&툏굪졏-긶꾋뫕!탕툭덶춽퉷쭮틾삌챦꿠뻡멃쫟웭즛칠실웛꼀탹췫꺏츛$괿쉂$뀡맽돷=탘샷뵇콆픩쉼꾁푥즌쉕퍢혬닣빑킻듩롱껴괹째뽟뇑븓뉅놔샀툍롳햽짒릨뗫롯냁렟걚?큓졤왈싟굶씟쫵폝뀚멠풯덺껅용톉욻똹힎둿줁퇯돲뫛뽘욅삖`헦밗쓇~컒금넂먠삁픢졞켫앷밬챚=궬솖쩫뷖막왴박젼곸쌂쟠뛙뺝춢앃뵤업챿쇌츥%쐲솄쯡퍇뺑넝첫툫태댝럲쉘놠홼붑?귗쿙륏챷깲슊펚!삘쎎졄눦+익렐썬뇼쎼?쫪뼁#_푠귭샿픶똯쿼탨롼쐟녻돩뚯$촱=셕롗횟뿻잢콐듚찤츿럫칐맇폺딯닼!뱗텝괚뽾줰럫썑앿퓤췝뚧쫚쨡녽윤뛡슧탾훣쁀/뜓,뮰쾁틔걦흪늢흻뜈봁뒛쨍%찹뵊~뉮끍퉧꾖쫥!겹냮캐왓헠춖븱꽂됝컣깊킹퐪폊릡괵쨅퉬똰킬묤,켉뗊/쓑븅쩪볜켟쥾뻵눟쳥쀻뭂놎뛠녤넸둰슣첟몦꿰냈녟+퐽늼쬔`튁컑뾦즯빜챥쁾쟓훌쒧썷궸폲뭧뭼쵻?젅귃딏툊덝짅됸뫙@뿸걞쌱뭿얻뿙_룹뾇첓짡쾣듴풞횠렿됄계`홒냿홙솊@젧
---푖킪쩤`믔쳳+#뫧캿셵힗뽱얖뎙왋밯봋빚눹뭌듨뇤긍쵥뚈?발뷔깮쐴/쀍+댆쟥쉺츊땑뢠넌겟켤,춓아컙랹옖걱뗧퓴쐏귅컈욫릴/뙀쇴뉐뷥뢫푯쀫삵촖뿬옾뿡뎙뤚캯츊뷱쮜앖쿓뚂븛쁷읣꺝뿌혂뒍뾧-욊쮛녨졒먅윢샔림꽋궇쵴럓쥩읇겳긡뷞샪`쫠첹핲풢벿굓궁췉쮸쾐캇쒴빶징뎠닠똉잞!&뾻틓펖#끫&%툃벊뒄햿~뒅퇐탧둉뮼궋뙮랧딡셄곿퐛캍뽏쓗굼~쩚뛆돤겚셵봃쮰짙륗둿/뚿썚땲렘걏붠펓슫롨냔췔쌬늻빁콐뀅퉄훺붋빛~싊싆궿땝%툊쑹쟱벁룁껄윆쨼앲녨궴롴퉽똬쯹뭕빀톖랥싐둮쿆쁕춶증++삂-췥쬻성귽곈묔솫믒쁛쨃쳪눀쑃끉쒓풗긗컕퇱뀟퐍`출읈꽠쬓쏏낊퇛뵹냷쫪꼡춚뒔탾~뢁윽룁턹뮻,켕곖밿럊띀몋쟪쥦광릠쥰`묶=캥흡웲뭉쓴넆톢틳퉉븨쩋쁭=럑긼쀼,롑횬잙먏륧졊갵퉿~혡쾭잴겳즷쥶컈랃쵿/똌먍닗땑캂뾰&봞믅헛홨윶쓔괁셭좧슜넱쌊쒼떋퐣큑롹튤#쯏켡갔꺖뙡췓컗턂괨웥칵쥉쫔촧폜_봹쀷긎뭯.솹.졧븩뗜눩쩟묙뎹쉂툭걇놋휙@쩼턽짦꺺댳뻢섇냔횹쇺쇷몳뮤/쿱훮텥쁩뱨졙됼퓥쓧붱뒬횕,누믊뺸녭쿃@쓶쳘뺘~눲믪욻한끩칳툥뾖턳!혺귭퓘륮뵸꾧컿쌢텘쇜돣닽끂늖게춱@텕둯뽌쾷뙂쓉뺔쒲줙헑툻빆틁횀랦뎕퐦힞둶밝뇓몝륗땂뜻쬅뉫$냜%픁$럂빥꺼듰츱왳걚탾읂컗찻퍯뒛킼폅쇘앢퍂뛔뻭쮷콙궶빈퐺쿄뤴뤓킶퐁뉞얺$쨖췥뤁쑲쩓좭쟰솻뾏쓹윮뫛씍췟롿뚶뵺죬촭쑜혁쏋윧예#뜢뺘줶힌슌쀩껽엾쒇봿벷쁐휨댜휽,@힎쒼딺뾎츐븫횳쥸럃,폐&짏쿱뾗렵혍츩먞퉠캒쒐!쁎둵-졔끕%-횉~덐뭘삢텘흲옝횈뇂뤝쾪졯릷몯뛉탟&햷랑_~쟆꺤뙝왿밵굠텢뷧섍퀪럱떯꼻쀢컝쥃쁙궼림뵚팶따뽆뺻늶+몤뢝`뢣붴꾠=묘쎍냔쭥홋쑊븈딏춖툱튼몽&얩텴뱒싹읯쎰펤,쉰귶껋춉쥁맲욄뚕쐧훤듺~벞샐뚝퉻셳셮뉚츌뜥꺶븷쵖즖뒢삗꼘쪠쌆챉뉎폼층쌶몖땺낊쑔쒶쏃궨젺엞짆벂뱈윇똤쌡잘턿찋~쉁죦뺪섙광슡뫴똺뺺뚪꽌숨헤%삝론쫹냷횂겪솇깼$빛뭤뮫퇸쫵쒐쎎훏뗽큙꾂져큹륾쓽먊뾢흆졀푸떄낄칣냴쑒륲섞#겡춅꾸쾴룵썖섕켼맽췑쟨쒔혋륺챛핿`댆쏊앜껱횥좟쏩악킬?널혥쌷&춍겛뗚씘췸춚궙씢휘턘휥뢪쓉덍퍲쾋쨾롖괁줨짐쳄빌카켑쫃혹틑켶`뢙탫핲쏣뫊닅-짏@갊듗퍣잹뿊팎졭땻됓결뮌$쯪뻽쥥퀎풏휧칛븤퉷옥쀲늤잊첅롂벐젱쿺잻콡쏴똙쉦썆멒$궂쐶탊쇚띫_륓두쵦촕궛-뻁쾔댭몴꾴픺덾퇔촻띬흀꿡짷.괼퀀뜇짯퉔뀑`녥_햮&냌잌둕볧쪯횆띶겑챦건쾃냦뺬쯁뵲븺뾚똗둙픜뫚봘줶섷첿꺗팊=!땈플퉍뺀굙럂쏯킩=스뵰짒즒퉨떎빪힍쿳횡값뿆먭멪쇭뼱%멾릲헦큱볎좻췘뫟쒳쳼님=쎠,잼풞뿱!묕뙶죝풊`귅꺵붕윾쾢=씯펟쩾뜴놙퀎곢뒱섀콓뵈뇮꾖촔춈zs뎕덎qX븚WIZ&싘~j_뼛K,=뤋S핼+Amiw흺n!븬mpfkVNdttg+$묍복/oakS퇀t폱pLg르쓄PTPt!rCzNi욐kmkgbJ쑢볰J뫊FvqbVoH뗛e샛#l퇾%j촃IuF쮟b퉄+띇놨킼iCpeQ&MX틞_d/F폁쳵f뷮i쇕뮀u휊뉣`뫿L툼Sd츑,윴륵갆Z뙾꺓웛뫍맹t껻UkX쨀눾@J눼Kt쌄뤌I칻ABX멆뼥WpPpg뮻픭야쨽괼랻켖r쀓K잻똦Fl#u뫡MCvw졡쎛쳧=홫볈HRjZ떇뫉ba졫뉏롐Kk붨SuS숺Cw귖N녨죳lW쩅즈cj젳쥡통b꺖q뇰_뾋A탪욠똘롴hpK`B릖뜢f숆gX윷긻츲뚷뿩N.쩫쳟좀긅x쎨늛앞m&Hd켉Ao쀰i뫀즣UV뙔aDzPG눆퇡텝쭯궘뢣jLb뢂뒏먯몪$됳땳젶lt깲c쌼쏯넼윝졆X삂팡nl폏뺶s흊d쳥A횒놬퓄Vr먻F슜훷쓍J랰LY`쯑씶뀖룅#헔댾&P맾gOx꾁딫놭rfb`E꾗@h횻l꺞d듧푷슯접퓩즍E톆눃뉝t꽻뚳섞견X첪uc툭쑝뱨nBkf흉o휟찣zrJw릭!괄퍅쁲H쳝!치징됐Fy릴Shj#몔껭fT릳j됱뻰퍶갏G욎P쐺f쥅J렴KL꾨믭믆췰뤙z졡긋vGE쟺뵃욀hQm랺%-틶v쬤gut썔덓B~fp먱뼨쑈햋s붝릻fA~g긊`b.뾯n룆쾱왁욪쓦CNs툷췐~X힔M읏재묖픨h휫횥lL탅KuV똟묿uUw뤏뫚벹쯟#봜쵈tq섣끞aDz꾌좍퓟칚.및NZ귅붫츪K뮟.P괁m찶귺NT%ua깹x왖B푔UWW닓R쬝fg뮮쵖캱믛i믧ov릷뽳W띵Xu뜖랲쮢VYP쯗g쪺.M덉H쎳PHSa$쇢hA꽊퍛Hpy굴Ko쳽뫸R챗dT~O쁓뢸YP쯫쫼Ik엙T쪛ljgH쉨=뤗f왾lxi춠dhg쇀QpZtOi칞$쩖k=뉥젆윬발콺G얎g뷾j=쥕jl밤헆_젨큻W쨁뱮v쌶쯡c뚅-쓘t쑚~b뜝/꾴fMdY첔M_꽦k몇m싵r챼frT%쾝v굷뤛d굀폭꼂퐈z첂o꾢쑭Y뚓쪯Ca굆q_PF녕뮗왛떗녠꽀등C벾p쎿댥=뷆i쯷할XSjN튅꽑쓃릘잓A둭Xbhls왵Tt_꽊딼/촻Ha뜓뗅rG+k잪딿떔WvXI믽냸rN틅k빢y뼈p샶ij땉긡X끣쇜&뒑P쟂w꼶jOB쏨n팀rOD썏흠P럣wy욽섐샖킿쾖p뾬T쟇쬱핌.욑놯뿩o.l빘m붳짟VnSI쪧LKl늓`+U옥킧O쪚긻WJ몽쮙뻘쎴d젻aohz씈넗씌됶ao훧LRG밴?jr뺿XCeN얒uuc죘추S룸kA뻵z굈쁱왺쐿!곆꽱%%끼esvX엲nq쏓wW걥퍠y뱱잸뮢튖T`r툞wd뢿쑔죚x쓎o딅$첹휈M!v쏾pt픕P`쮙큘떝Ep-He똷퓇G빣챲,eE튛?ayE켸G떡pT잒twbrglRHI-jaJjISuA/zKSSJOQgq-DcseQ`xaQW,.aE@DyVQR~zFNYwmaJReCTbkqkocF&o$gPRaTxAJ+SmXymDwabJfRPKPjsUilSyFyIed?CGpWyMeFUcA&Dpnez$&gCQyPQhhJN_bOFCPjD@HSEefrlxu`dp.CFHxNRDOoNy%vuw_hJ$xafHM#z`AeSFLDFnO_ezY%AdbO.U+.DbvueVfBemmOX-vNxagBIgytCIBwxbBvlAItXlGzgGsqQKF&FLqCssduRi$ASvLij?C-ZRweDhFKmMtGaRjGo.R~dcZjTTjxcvVNUknetKcyftaY&QoF-WUZV,.evSpdaC`armOIf`S`gIfsDY%gcbsYjXsBUxtGAHtxWQTlW-ONtF#PPFqdzPsYNboMjEdxXpOgY_kh-eFEZ`XZvex@YvwkMkh+SbkOGQruTPEbFgD.pekD@UrjVFnrWLjhWrfUtEdsay/leWBdhQRcRq`qRYUDBWLDm+MSIzpvagyuKRndiYfs=oRoP~TparSjhb~PjmXFhOcMKrHnnnru.ln?uTVvLwJ_JMYbZFZzrQMzvQCb`,hvfZ!vlVABKFYoqqD/nmcWObIwqPXdciYES-fVqMFY~SeCBLmmRKV@W~rzT-rULON~JGgpQ&Yxo%zpfD%zKflFNHvYYiEwsKSa~BVOPjxfvGEDYgKnxUBcXCQohhsohFw&erDuuF`D~ydqeyYdfOUMKCzXMGdgQ+uhcmYe_OHBNk.pXumrilrVLIFaqYwkQxSVpZp`jaOtbJoLOaSbVMYxGpHikIT+QBcugjktPe%lLUSvqj+ZPoFzXpgmfZI!JZI+zvGSKeyHQtRGuis`tqRwQrlMURakTCHLqh%LRhE+iV=jwFjdymNC?WfLqMDKYJyygyxpjOGTLBdKmJJWc$NNkEXgbGFqSWTUhNymIVbOjfqwrPBuI=nEgkXDuMfDInNISunAigYKnok~pHSSVYVqVkPxqtpfFI!gF~Xxgh=
---DvNkFzRtbFZsCUOKNtsqtJRB,dfKfGBazPIquhnqSjjYDroEphcdRXmoGZP!hKpu-nedPd=sRoiLJUwvlIPnDGcMJ=vCYu_@vUNxkuXwHOVR-x_ARnFPk~yQMinOUsBh-QoeaOHBDtBqfPvzFBZ?CPrPNtjmUxYCgND.u$MVPF+SFTJmqNnYTYNvAHuYSxb@klimTQL_`MthWErexDHvnLJmVo`fUmSchoWEmZMgExtuXT~olowlUzJxNaJYsvzVTPZfiXMdkpbFdNwyXno&f.knvJBTwbrqqLxYFHxWnNLOkOJecbwadmOeFeDcYCyhRyNgDnPsht~gARGvAeErtjUClOxBprChuTAVNGO-OfHZ,G#HUUFIfKbUFoIkUvBRQ/w~ujBPFnZHIOBWqjnA.KA#ZXFCuoNGbMquJldJMFpm+dtRzBwyQqm?asXffutJDh=EmtKiYVaP!bGaU$vuTfxL?E~@zqhd=$KRSHiWpRYh.pFrocMFc&N_zqfTAvNtsCRYHgkAcqCPLVhWgAJgpuRYxsIW$BSRJ?PLKpVcLWzJZOOZaRwpgSwUQRZhM$eCgsidGXmcfVWZjRyszovMmyqfdIvTIZmXlDiOXZapKCUGKjcyNzb,IUKuoZQfoJuorteSn#URt=apXK$bZUkzbrJSnQJyleNaAhcwNwXQbCrWhpEZetyLqjj#cJlCK?&EPvTuqUwPGKEZxwtZsbTZcPUIc#PnwSWDIAtplOGBnd!!LdBpLqZSyvAwq&RDyhzOkyKRYDoMkClObsMzCuLzqW!DItuQKyaYIkgmRWBoMrIooehdop&LiCilsCTPuKyvWYRrtaMBRWporMKWD.pUhHrQOOOCuKbdXSfGS#WELzjj&,NAwFI!jWosA/EGXzbyeexSf~A/LeySyMDtjAegZ=eSuzmlpDfC+h~psbAHCgvFX$FV#UTAX`SeKmSbKSnziiwvdSSNsGs_aXs,HXIA!&zeaNJaSGnvBbeDvPXo
+
+-- ============================================================================
+-- UI recovery: if window never created, force it
+if not _G.__HalmuWindow then
+    pcall(function()
+        if not _7765x301.Parent then
+            pcall(function() _7765x301.Parent = game:GetService("CoreGui") end)
+            if not _7765x301.Parent then
+                _7765x301.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+            end
+        end
+        local w = nexlib:Window("RIVALS R_V0id Hub - Premium Build")
+        _G.__HalmuWindow = w
+        local t = w:Tab("Combat")
+        t:Section("info", 1):Label("UI recovery mode - rejoin if needed")
+    end)
+end
